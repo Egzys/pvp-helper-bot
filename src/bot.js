@@ -1,3 +1,11 @@
+const http = require('http');
+
+// Petit serveur pour que Render soit content
+http.createServer((req, res) => {
+  res.write("La poutre est en ligne, fada !");
+  res.end();
+}).listen(8080);
+
 require("dotenv").config();
 const { Client, GatewayIntentBits } = require("discord.js");
 
