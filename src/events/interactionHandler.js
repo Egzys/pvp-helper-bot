@@ -6,8 +6,6 @@ const {
   EmbedBuilder
 } = require("discord.js");
 
-const db = require("../database");
-
 module.exports = (client) => {
   client.on("interactionCreate", async (interaction) => {
 
