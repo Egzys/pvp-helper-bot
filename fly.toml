@@ -1,0 +1,8 @@
+app = "bot-pvp-wow"
+primary_region = "cdg"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  # Ici tu peux mettre des variables non secrètes si besoin
