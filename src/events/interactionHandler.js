@@ -28,7 +28,7 @@ module.exports = (client) => {
 
         const embed = new EmbedBuilder()
           .setTitle(`⚔️ PvP Event: ${eventName}`)
-          .setDescription("Inscrivez-vous pour le combat !")
+          .setDescription("Inscrivez-vous pour le combat ! Renseignez votre classe en Français ( guerrier, mage, pretre, druide, voleur, chasseur, demoniste, paladin, chaman, moine, demonhunter, evoker")
           .setColor("#ff0000")
           .addFields({ name: "👥 Participants", value: "Aucun inscrit" });
 
@@ -107,6 +107,6 @@ module.exports = (client) => {
 };
 
 function emojiClass(cls) {
-  const map = { warrior: "⚔️ Warrior", mage: "❄️ Mage", priest: "✝️ Priest", druid: "🌿 Drood", rogue: "🗡️ Rogue", hunter: "🏹 Hunt", warlock: "🔥 Warlock", paladin: "🛡️ Paladin", shaman: "🌩️ Shaman", monk: "🥋 Monk", demonhunter: "😈 DH", evoker: "🐉 Evoker" };
+  const map = { guerrier: "⚔️ Guerrier", mage: "❄️ Mage", pretre: "✝️ Prêtre", druide: "🌿 Druide", voleur: "🗡️ Voleur", chasseur: "🏹 Chasseur", demoniste: "🔥 Démoniste", paladin: "🛡️ Paladin", chaman: "🌩️ Chaman", monk: "🥋 Moine", demonhunter: "😈 DH", evoker: "🐉 Evoker" };
   return map[cls.toLowerCase()] || "🎮";
 }
