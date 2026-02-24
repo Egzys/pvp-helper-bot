@@ -7,7 +7,6 @@ const {
 } = require("discord.js");
 
 const db = require("../database");
-const pvpCreate = require("../commands/pvpCreate");
 
 module.exports = (client) => {
   client.on("interactionCreate", async (interaction) => {
@@ -35,7 +34,7 @@ module.exports = (client) => {
 
       const classInput = new TextInputBuilder()
         .setCustomId("class")
-        .setLabel("Classe (Warrior, Mage...)")
+        .setLabel("Classe (Warrior, Mage...) *Mettre le nom anglais*")
         .setStyle(TextInputStyle.Short)
         .setRequired(true);
 
@@ -65,11 +64,6 @@ module.exports = (client) => {
       if (isNaN(rating) || rating < 0 || rating > 3000) {
         return interaction.reply({ content: "❌ Rating invalide (0-3000)", ephemeral: true });
       }
-
-      db.prepare("INSERT INTO signups VALUES (?,?,?,?,?,?)")
-        .run(event, interaction.user.username, character, classe, role, rating);
-
-      const players = db.prepare("SELECT * FROM signups WHERE event=? ORDER BY rating DESC").all(event);
 
       let list = players.map(p =>
         `${emojiClass(p.class)} **${p.character}** - ${p.role.toUpperCase()} - 🏆 ${p.rating}`

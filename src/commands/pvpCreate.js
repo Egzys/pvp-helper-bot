@@ -1,5 +1,4 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsBitField } = require("discord.js");
-const db = require("../database");
 
 module.exports = async (interaction) => {
 
@@ -25,8 +24,4 @@ module.exports = async (interaction) => {
   );
 
   const msg = await interaction.reply({ embeds: [embed], components: [row], fetchReply: true });
-
-  // Save event message
-  db.prepare("INSERT OR REPLACE INTO events VALUES (?,?,?)")
-    .run(name, interaction.channel.id, msg.id);
 };
