@@ -12,4 +12,5 @@ RUN npm install
 COPY . .
 
 # On lance la poutre
+CMD [ "node", "deploy-commands.js" ]
 CMD [ "node", "src/bot.js" ]
