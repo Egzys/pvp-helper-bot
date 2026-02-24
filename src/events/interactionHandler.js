@@ -23,7 +23,6 @@ module.exports = (client) => {
           .setColor("#ff0000");
 
         const row = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId("tank_event1").setLabel("🛡️ Tank").setStyle(ButtonStyle.Primary),
           new ButtonBuilder().setCustomId("heal_event1").setLabel("💚 Heal").setStyle(ButtonStyle.Success),
           new ButtonBuilder().setCustomId("dps_event1").setLabel("⚔️ DPS").setStyle(ButtonStyle.Danger)
         );
