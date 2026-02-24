@@ -33,9 +33,21 @@ module.exports = (client) => {
 
     // 2. Clic sur un bouton d'inscription
     if (interaction.isButton()) {
-      const [role, event] = interaction.customId.split("_");
+      // On vérifie que le customId contient bien un "_" pour éviter de split dans le vide
+      if (!interaction.customId.includes("_")) return;
+
+      const parts = interaction.customId.split("_");
+      const role = parts[0];
+      const event = parts[1];
+
+      // Vérifie si "event" ou "role" sont bien définis ici
+      if (!role || !event) {
+        console.error("L'ID du bouton est mal formé :", interaction.customId);
+        return;
+      }
+
       const modal = new ModalBuilder()
-        .setCustomId(`signup_${event}_${role}`)
+        .setCustomId(`signup_${event}_${role}`) // Ici on utilise bien les variables extraites
         .setTitle("⚔️ Inscription PvP");
 
       // ... (tes inputs restent les mêmes)
