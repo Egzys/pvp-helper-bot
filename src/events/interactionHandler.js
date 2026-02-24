@@ -1,3 +1,4 @@
+// interactionHandler.js
 const { 
   ModalBuilder, 
   TextInputBuilder, 
@@ -5,52 +6,65 @@ const {
   TextInputStyle,
   EmbedBuilder,
   ButtonBuilder,
-  ButtonStyle
+  ButtonStyle,
+  PermissionsBitField
 } = require("discord.js");
 
-// On crée une liste vide pour stocker les inscrits (en mémoire)
-let players = [];
+// On utilise un objet pour séparer les inscrits par nom d'événement
+let eventsData = {}; 
 
 module.exports = (client) => {
   client.on("interactionCreate", async (interaction) => {
 
-    // 1. Commande Slash : /pvp-create
+    // --- 1. COMMANDES SLASH ---
     if (interaction.isChatInputCommand()) {
+      
+      // CRÉATION D'EVENT
       if (interaction.commandName === "pvp-create") {
+        const eventName = interaction.options.getString("name");
+        
+        // On initialise l'entrée dans notre objet s'il n'existe pas
+        eventsData[eventName] = [];
+
         const embed = new EmbedBuilder()
-          .setTitle("⚔️ Nouvel Événement PvP")
+          .setTitle(`⚔️ PvP Event: ${eventName}`)
           .setDescription("Inscrivez-vous pour le combat !")
-          .setColor("#ff0000");
+          .setColor("#ff0000")
+          .addFields({ name: "👥 Participants", value: "Aucun inscrit" });
 
         const row = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId("heal_event1").setLabel("💚 Heal").setStyle(ButtonStyle.Success),
-          new ButtonBuilder().setCustomId("dps_event1").setLabel("⚔️ DPS").setStyle(ButtonStyle.Danger)
+          new ButtonBuilder().setCustomId(`heal_${eventName}`).setLabel("💚 Heal").setStyle(ButtonStyle.Success),
+          new ButtonBuilder().setCustomId(`dps_${eventName}`).setLabel("⚔️ DPS").setStyle(ButtonStyle.Danger)
         );
 
         return interaction.reply({ embeds: [embed], components: [row] });
       }
+
+      // SUPPRESSION / RESET D'EVENT
+      if (interaction.commandName === "pvp-clear") {
+        if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+          return interaction.reply({ content: "Tu n'as pas les droits, mon gâté !", ephemeral: true });
+        }
+
+        const eventName = interaction.options.getString("name");
+        
+        if (eventsData[eventName]) {
+          delete eventsData[eventName]; // On supprime l'entrée
+          return interaction.reply({ content: `✅ La liste pour **${eventName}** a été vidée !`, ephemeral: true });
+        } else {
+          return interaction.reply({ content: "⚠️ Cet événement n'existe pas dans la mémoire.", ephemeral: true });
+        }
+      }
     }
 
-    // 2. Clic sur un bouton d'inscription
+    // --- 2. CLIC SUR BOUTON ---
     if (interaction.isButton()) {
-      // On vérifie que le customId contient bien un "_" pour éviter de split dans le vide
-      if (!interaction.customId.includes("_")) return;
-
-      const parts = interaction.customId.split("_");
-      const role = parts[0];
-      const event = parts[1];
-
-      // Vérifie si "event" ou "role" sont bien définis ici
-      if (!role || !event) {
-        console.error("L'ID du bouton est mal formé :", interaction.customId);
-        return;
-      }
+      const [role, eventName] = interaction.customId.split("_");
 
       const modal = new ModalBuilder()
-        .setCustomId(`signup_${event}_${role}`) // Ici on utilise bien les variables extraites
-        .setTitle("⚔️ Inscription PvP");
+        .setCustomId(`signup_${eventName}_${role}`)
+        .setTitle(`Inscription : ${eventName}`);
 
-      // ... (tes inputs restent les mêmes)
       const charInput = new TextInputBuilder().setCustomId("character").setLabel("Nom du perso").setStyle(TextInputStyle.Short).setRequired(true);
       const classInput = new TextInputBuilder().setCustomId("class").setLabel("Classe (Anglais)").setStyle(TextInputStyle.Short).setRequired(true);
       const ratingInput = new TextInputBuilder().setCustomId("rating").setLabel("Rating (0-3000)").setStyle(TextInputStyle.Short).setRequired(true);
@@ -63,24 +77,27 @@ module.exports = (client) => {
       return interaction.showModal(modal);
     }
 
-    // 3. Validation du formulaire (Modal)
+    // --- 3. VALIDATION MODAL ---
     if (interaction.isModalSubmit()) {
-      const [_, event, role] = interaction.customId.split("_");
+      const [_, eventName, role] = interaction.customId.split("_");
       const character = interaction.fields.getTextInputValue("character");
       const classe = interaction.fields.getTextInputValue("class");
       const rating = parseInt(interaction.fields.getTextInputValue("rating"));
 
       if (isNaN(rating)) return interaction.reply({ content: "❌ Rating invalide", ephemeral: true });
 
-      // On ajoute le joueur à la liste
-      players.push({ character, class: classe, rating, role, event });
+      // Sécurité : si l'event n'est pas initialisé
+      if (!eventsData[eventName]) eventsData[eventName] = [];
 
-      let list = players.map(p =>
+      // Ajout unique à cet event
+      eventsData[eventName].push({ character, class: classe, rating, role });
+
+      let list = eventsData[eventName].map(p =>
         `${emojiClass(p.class)} **${p.character}** - ${p.role.toUpperCase()} - 🏆 ${p.rating}`
       ).join("\n");
 
       const embed = new EmbedBuilder()
-        .setTitle(`⚔️ PvP Event: ${event}`)
+        .setTitle(`⚔️ PvP Event: ${eventName}`)
         .setColor("#ff0000")
         .addFields({ name: "👥 Participants", value: list || "Aucun inscrit" });
 
