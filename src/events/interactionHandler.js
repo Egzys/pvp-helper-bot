@@ -32,7 +32,7 @@ module.exports = (client) => {
           .setColor("#ff0000")
           .addFields(
             { name: "👥 Participants", value: "Aucun inscrit" },
-            { name: "⚠️ IMPORTANT ", value: "Renseignez votre classe en Français ( guerrier, mage, pretre, druide, voleur, chasseur, demoniste, paladin, chaman, moine, demonhunter, evoker"}
+            { name: "⚠️ IMPORTANT ", value: "Renseignez votre classe en Français ( guerrier, mage, pretre, druide, voleur, chasseur, demoniste, paladin, chaman, moine, demonhunter, evoker )"}
           );
 
         const row = new ActionRowBuilder().addComponents(
@@ -69,7 +69,7 @@ module.exports = (client) => {
         .setTitle(`Inscription : ${eventName}`);
 
       const charInput = new TextInputBuilder().setCustomId("character").setLabel("Nom du perso").setStyle(TextInputStyle.Short).setRequired(true);
-      const classInput = new TextInputBuilder().setCustomId("class").setLabel("Classe (Anglais)").setStyle(TextInputStyle.Short).setRequired(true);
+      const classInput = new TextInputBuilder().setCustomId("class").setLabel("Classe (en Français)").setStyle(TextInputStyle.Short).setRequired(true);
       const ratingInput = new TextInputBuilder().setCustomId("rating").setLabel("Rating (0-3000)").setStyle(TextInputStyle.Short).setRequired(true);
 
       modal.addComponents(
@@ -101,8 +101,11 @@ module.exports = (client) => {
 
       const embed = new EmbedBuilder()
         .setTitle(`⚔️ PvP Event: ${eventName}`)
-        .setColor("#ff0000")
-        .addFields({ name: "👥 Participants", value: list || "Aucun inscrit" });
+        .setColor("#1927a3")
+        .addFields(
+          { name: "👥 Participants", value: list || "Aucun inscrit" },
+          { name: "⚠️ IMPORTANT ", value: "Renseignez votre classe en Français ( guerrier, mage, pretre, druide, voleur, chasseur, demoniste, paladin, chaman, moine, demonhunter, evoker )"}
+        );
 
       await interaction.update({ embeds: [embed] });
     }
