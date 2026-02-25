@@ -28,9 +28,12 @@ module.exports = (client) => {
 
         const embed = new EmbedBuilder()
           .setTitle(`⚔️ PvP Event: ${eventName}`)
-          .setDescription("Inscrivez-vous pour le combat ! Renseignez votre classe en Français ( guerrier, mage, pretre, druide, voleur, chasseur, demoniste, paladin, chaman, moine, demonhunter, evoker")
+          .setDescription("Inscrivez-vous pour le combat ! ")
           .setColor("#ff0000")
-          .addFields({ name: "👥 Participants", value: "Aucun inscrit" });
+          .addFields(
+            { name: "👥 Participants", value: "Aucun inscrit" },
+            { name: "⚠️ IMPORTANT ", value: "Renseignez votre classe en Français ( guerrier, mage, pretre, druide, voleur, chasseur, demoniste, paladin, chaman, moine, demonhunter, evoker"}
+          );
 
         const row = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId(`heal_${eventName}`).setLabel("💚 Heal").setStyle(ButtonStyle.Success),
