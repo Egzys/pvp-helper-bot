@@ -14,6 +14,25 @@ const MODE_LIMITS = {
 
 const ALLOWED_MODES = Object.keys(MODE_LIMITS);
 
+/*
+  Remplace les IDs ci-dessous par TES vrais emojis custom Discord.
+*/
+const CLASS_EMOJIS = {
+  warrior: "<:warrior~1:>",
+  paladin: "<:paladin~1:>",
+  hunter: "<:hunt~1:>",
+  rogue: "<:rogue~1:>",
+  priest: "<:priest~1:>",
+  deathknight: "<:dk~1:>",
+  shaman: "<:sham:>",
+  mage: "<:mage~2:>",
+  warlock: "<:warlock~1:>",
+  monk: "<:monk~1:>",
+  druid: "<:drood:>",
+  demonhunter: "<:dh~1:>",
+  evoker: "<:evok:>",
+};
+
 function parseEventDate(input) {
   const regex = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/;
   const match = String(input || "").trim().match(regex);
@@ -81,31 +100,98 @@ function normalizeClassName(input) {
     .trim()
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\s_-]+/g, "");
 }
 
-function prettyClassName(cls) {
-  const normalized = normalizeClassName(cls);
+function canonicalClassKey(input) {
+  const value = normalizeClassName(input);
 
   const map = {
-    guerrier: "Guerrier",
-    mage: "Mage",
-    pretre: "Prêtre",
-    druide: "Druide",
-    voleur: "Voleur",
-    chasseur: "Chasseur",
-    demoniste: "Démoniste",
-    paladin: "Paladin",
-    chaman: "Chaman",
-    moine: "Moine",
-    monk: "Moine",
-    demonhunter: "DH",
-    dh: "DH",
-    evoker: "Evoker",
-    evocateur: "Evoker",
+    guerrier: "warrior",
+    warrior: "warrior",
+
+    paladin: "paladin",
+
+    chasseur: "hunter",
+    hunter: "hunter",
+
+    voleur: "rogue",
+    rogue: "rogue",
+
+    pretre: "priest",
+    prêtre: "priest",
+    priest: "priest",
+
+    chevalierdelamort: "deathknight",
+    chevaliermort: "deathknight",
+    dk: "deathknight",
+    deathknight: "deathknight",
+
+    chaman: "shaman",
+    shaman: "shaman",
+
+    mage: "mage",
+
+    demoniste: "warlock",
+    démoniste: "warlock",
+    warlock: "warlock",
+
+    moine: "monk",
+    monk: "monk",
+
+    druide: "druid",
+    druid: "druid",
+
+    chasseurdedemons: "demonhunter",
+    chasseurdedémons: "demonhunter",
+    dh: "demonhunter",
+    demonhunter: "demonhunter",
+
+    evocateur: "evoker",
+    évocateur: "evoker",
+    evoker: "evoker",
   };
 
-  return map[normalized] || cls;
+  return map[value] || null;
+}
+
+function prettyClassName(input) {
+  const key = canonicalClassKey(input);
+
+  const map = {
+    warrior: "Guerrier",
+    paladin: "Paladin",
+    hunter: "Chasseur",
+    rogue: "Voleur",
+    priest: "Prêtre",
+    deathknight: "Chevalier de la mort",
+    shaman: "Chaman",
+    mage: "Mage",
+    warlock: "Démoniste",
+    monk: "Moine",
+    druid: "Druide",
+    demonhunter: "Chasseur de démons",
+    evoker: "Évocateur",
+  };
+
+  return map[key] || input;
+}
+
+function getClassIcon(input) {
+  const key = canonicalClassKey(input);
+  if (!key) return "";
+  return CLASS_EMOJIS[key] || "";
+}
+
+function getClassDisplay(input) {
+  const icon = getClassIcon(input);
+
+  if (icon) {
+    return icon;
+  }
+
+  return prettyClassName(input);
 }
 
 function getModeLimits(mode) {
@@ -139,7 +225,7 @@ function buildRoleList(participants, role) {
 
   return filtered
     .map((p, index) => {
-      return `**${index + 1}.** ${prettyClassName(p.class)} — **${p.character}** — **${p.rating}**`;
+      return `**${index + 1}.** ${getClassDisplay(p.class)} — **${p.character}** — **${p.rating}**`;
     })
     .join("\n");
 }
@@ -172,43 +258,63 @@ function buildEventEmbed(event) {
         : "Inscrivez-vous avec les boutons ci-dessous."
     )
     .addFields(
-      { name: "Mode", value: event.mode, inline: true },
-      { name: "Début", value: formatDiscordTimestamp(event.startAt), inline: true },
-      { name: "Fin", value: formatDiscordTimestamp(event.endAt), inline: true },
+      {
+        name: "Début",
+        value: formatDiscordTimestamp(event.startAt),
+        inline: true,
+      },
+      {
+        name: "Fin",
+        value: formatDiscordTimestamp(event.endAt),
+        inline: true,
+      },
+      {
+        name: "Mode",
+        value: event.mode,
+        inline: true,
+      },
+
+      {
+        name: "TANKS",
+        value: `**${tankCount}/${limits.tank}**`,
+        inline: true,
+      },
+      {
+        name: "HEALS",
+        value: `**${healCount}/${limits.heal}**`,
+        inline: true,
+      },
       {
         name: "Statut",
         value: locked ? "Verrouillé" : "Ouvert",
         inline: true,
       },
+
       {
-        name: "Tanks",
-        value: `**${tankCount}/${limits.tank}**`,
-        inline: true,
-      },
-      {
-        name: "Heals",
-        value: `**${healCount}/${limits.heal}**`,
-        inline: true,
-      },
-      {
-        name: "DPS",
-        value: `**${dpsCount}/${limits.dps}**`,
-        inline: true,
-      },
-      {
-        name: "Liste Tank",
+        name: "LISTE TANK",
         value: buildRoleList(event.participants, "tank"),
         inline: true,
       },
       {
-        name: "Liste Heal",
+        name: "LISTE HEAL",
         value: buildRoleList(event.participants, "heal"),
         inline: true,
       },
       {
-        name: "Liste DPS",
-        value: buildRoleList(event.participants, "dps"),
+        name: "\u200B",
+        value: "\u200B",
         inline: true,
+      },
+
+      {
+        name: "DPS",
+        value: `**${dpsCount}/${limits.dps}**`,
+        inline: false,
+      },
+      {
+        name: "LISTE DPS",
+        value: buildRoleList(event.participants, "dps"),
+        inline: false,
       }
     )
     .setFooter({ text: `ID event: ${event.id}` });
@@ -252,6 +358,7 @@ function sanitizeMode(mode) {
 module.exports = {
   MODE_LIMITS,
   ALLOWED_MODES,
+  CLASS_EMOJIS,
   parseEventDate,
   formatDiscordTimestamp,
   formatDiscordTimestampShort,
@@ -259,7 +366,10 @@ module.exports = {
   isLocked,
   sortParticipants,
   normalizeClassName,
+  canonicalClassKey,
   prettyClassName,
+  getClassIcon,
+  getClassDisplay,
   getModeLimits,
   countRole,
   isRoleFull,
