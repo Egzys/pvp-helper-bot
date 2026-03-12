@@ -18,19 +18,19 @@ const ALLOWED_MODES = Object.keys(MODE_LIMITS);
   Remplace les IDs ci-dessous par TES vrais emojis custom Discord.
 */
 const CLASS_EMOJIS = {
-  warrior: "<:warrior~1:1481704387117060238>",
-  paladin: "<:paladin~1:1481704188584136974>",
-  hunter: "<:hunt~1:1481704077359452161>",
-  rogue: "<:rogue~1:1481704264828190830>",
-  priest: "<:priest~1:1481704225393082629>",
-  deathknight: "<:dk~1:1481704008505888889>",
-  shaman: "<:sham:1481704310663544984>",
-  mage: "<:mage~2:1481704115057983519>",
-  warlock: "<:warlock~1:1481704353197985873>",
-  monk: "<:monk~1:1481704154085855393>",
-  druid: "<:drood:1481703822752612472>",
-  demonhunter: "<:dh~1:1481703971226910982>",
-  evoker: "<:evok:1481703775247794381>",
+  warrior: "<:warrior_anima:1481698186514010283>",
+  paladin: "<:paladin_anima:1481698233171443763>",
+  hunter: "<:hunt_anima:1481698268789346380>",
+  rogue: "<:rogue_anima:1481698286321532948>",
+  priest: "<:priest_anima:1481698303304274073>",
+  deathknight: "<:dk_anima:1481698324791824454>",
+  shaman: "<:sham_anima:1481698351878635540>",
+  mage: "<:mage_anima:1481698370970980606>",
+  warlock: "<:warlock_anima:1481698395495075890>",
+  monk: "<:monk_anima:1481698413367005407>",
+  druid: "<:drood_anima:1481698435693281360>",
+  demonhunter: "<:dh_anima:1481698453523529920>",
+  evoker: "<:evok_anima:1481698475912462456>",
 };
 
 function parseEventDate(input) {
