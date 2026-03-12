@@ -5,7 +5,14 @@ const {
   ButtonStyle,
 } = require("discord.js");
 
-const ALLOWED_MODES = ["RBG", "Solo Shuffle", "3v3", "2v2"];
+const MODE_LIMITS = {
+  RBG: { heal: 2, dps: 8 },
+  "Solo Shuffle": { heal: 2, dps: 4 },
+  "3v3": { heal: 1, dps: 2 },
+  "2v2": { heal: 1, dps: 1 },
+};
+
+const ALLOWED_MODES = Object.keys(MODE_LIMITS);
 
 function parseEventDate(input) {
   const regex = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/;
@@ -91,12 +98,41 @@ function prettyClassName(cls) {
     paladin: "Paladin",
     chaman: "Chaman",
     moine: "Moine",
+    monk: "Moine",
     demonhunter: "DH",
     dh: "DH",
+    evoker: "Evoker",
     evocateur: "Evoker",
   };
 
   return map[normalized] || cls;
+}
+
+function getModeLimits(mode) {
+  return MODE_LIMITS[mode] || { heal: 0, dps: 0 };
+}
+
+function countRole(participants, role) {
+  return participants.filter((p) => p.role === role).length;
+}
+
+function isRoleFull(event, role, userId = null) {
+  const limits = getModeLimits(event.mode);
+  const roleLimit = limits[role] ?? 0;
+
+  const count = event.participants.filter((p) => {
+    if (userId && p.userId === userId) return false;
+    return p.role === role;
+  }).length;
+
+  return count >= roleLimit;
+}
+
+function isEventFull(event, userId = null) {
+  return (
+    isRoleFull(event, "heal", userId) &&
+    isRoleFull(event, "dps", userId)
+  );
 }
 
 function buildRoleList(participants, role) {
@@ -117,14 +153,19 @@ function buildRoleList(participants, role) {
 
 function buildSummaryLine(event) {
   const status = isLocked(event) ? "VERROUILLÉ" : "OUVERT";
+  const limits = getModeLimits(event.mode);
+  const healCount = countRole(event.participants, "heal");
+  const dpsCount = countRole(event.participants, "dps");
+
   return `**#${event.id}** — ${event.name} — ${event.mode} — ${formatDiscordTimestampShort(
     event.startAt
-  )} — ${event.participants.length} inscrit(s) — ${status}`;
+  )} — Heal ${healCount}/${limits.heal} — DPS ${dpsCount}/${limits.dps} — ${status}`;
 }
 
 function buildEventEmbed(event) {
-  const healCount = event.participants.filter((p) => p.role === "heal").length;
-  const dpsCount = event.participants.filter((p) => p.role === "dps").length;
+  const limits = getModeLimits(event.mode);
+  const healCount = countRole(event.participants, "heal");
+  const dpsCount = countRole(event.participants, "dps");
   const locked = isLocked(event);
 
   return new EmbedBuilder()
@@ -146,12 +187,12 @@ function buildEventEmbed(event) {
       },
       {
         name: "Heals",
-        value: `**${healCount}**`,
+        value: `**${healCount}/${limits.heal}**`,
         inline: true,
       },
       {
         name: "DPS",
-        value: `**${dpsCount}**`,
+        value: `**${dpsCount}/${limits.dps}**`,
         inline: true,
       },
       {
@@ -168,20 +209,23 @@ function buildEventEmbed(event) {
     .setFooter({ text: `ID event: ${event.id}` });
 }
 
-function buildEventButtons(eventId, locked = false) {
+function buildEventButtons(event, locked = false) {
+  const healFull = isRoleFull(event, "heal");
+  const dpsFull = isRoleFull(event, "dps");
+
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId(`join_${eventId}_heal`)
-      .setLabel("Heal")
+      .setCustomId(`join_${event.id}_heal`)
+      .setLabel(healFull ? "Heal (complet)" : "Heal")
       .setStyle(ButtonStyle.Success)
-      .setDisabled(locked),
+      .setDisabled(locked || healFull),
     new ButtonBuilder()
-      .setCustomId(`join_${eventId}_dps`)
-      .setLabel("DPS")
+      .setCustomId(`join_${event.id}_dps`)
+      .setLabel(dpsFull ? "DPS (complet)" : "DPS")
       .setStyle(ButtonStyle.Danger)
-      .setDisabled(locked),
+      .setDisabled(locked || dpsFull),
     new ButtonBuilder()
-      .setCustomId(`leave_${eventId}`)
+      .setCustomId(`leave_${event.id}`)
       .setLabel("Quitter l'event")
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(locked)
@@ -195,6 +239,7 @@ function sanitizeMode(mode) {
 }
 
 module.exports = {
+  MODE_LIMITS,
   ALLOWED_MODES,
   parseEventDate,
   formatDiscordTimestamp,
@@ -204,6 +249,10 @@ module.exports = {
   sortParticipants,
   normalizeClassName,
   prettyClassName,
+  getModeLimits,
+  countRole,
+  isRoleFull,
+  isEventFull,
   buildRoleList,
   buildSummaryLine,
   buildEventEmbed,
