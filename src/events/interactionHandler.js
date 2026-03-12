@@ -4,6 +4,7 @@ const {
   ActionRowBuilder,
   TextInputStyle,
   PermissionsBitField,
+  AttachmentBuilder,
 } = require("discord.js");
 
 const {
@@ -12,6 +13,7 @@ const {
   getEventById,
   removeEventById,
   listGuildFiles,
+  getGuildFilePath,
 } = require("../utils/eventStore");
 
 const {
@@ -23,6 +25,7 @@ const {
   buildEventEmbed,
   buildEventButtons,
   sanitizeMode,
+  isRoleFull,
 } = require("../utils/eventHelpers");
 
 function isAdmin(interaction) {
@@ -55,7 +58,7 @@ async function refreshEventMessage(client, event) {
 
     await message.edit({
       embeds: [buildEventEmbed(event)],
-      components: [buildEventButtons(event.id, isLocked(event))],
+      components: [buildEventButtons(event, isLocked(event))],
     });
   } catch (error) {
     console.error(`Impossible de mettre à jour l'event #${event.id}`, error);
@@ -161,7 +164,7 @@ module.exports = (client) => {
 
         const reply = await interaction.reply({
           embeds: [buildEventEmbed(event)],
-          components: [buildEventButtons(event.id, false)],
+          components: [buildEventButtons(event, false)],
           fetchReply: true,
         });
 
@@ -345,6 +348,26 @@ module.exports = (client) => {
           ephemeral: true,
         });
       }
+
+      if (interaction.commandName === "pvp-export") {
+        if (!isAdmin(interaction)) {
+          return interaction.reply({
+            content: "Tu dois être administrateur pour exporter le JSON.",
+            ephemeral: true,
+          });
+        }
+
+        const filePath = getGuildFilePath(guildId);
+        const attachment = new AttachmentBuilder(filePath, {
+          name: `${guildId}-pvp-events.json`,
+        });
+
+        return interaction.reply({
+          content: "Export JSON du serveur :",
+          files: [attachment],
+          ephemeral: true,
+        });
+      }
     }
 
     if (interaction.isButton()) {
@@ -372,6 +395,13 @@ module.exports = (client) => {
         if (isLocked(event)) {
           return interaction.reply({
             content: "Les inscriptions sont verrouillées pour cet event.",
+            ephemeral: true,
+          });
+        }
+
+        if (isRoleFull(event, role, interaction.user.id)) {
+          return interaction.reply({
+            content: `Le slot ${role.toUpperCase()} est déjà complet.`,
             ephemeral: true,
           });
         }
@@ -489,6 +519,13 @@ module.exports = (client) => {
         });
       }
 
+      if (isRoleFull(event, role, interaction.user.id)) {
+        return interaction.reply({
+          content: `Le slot ${role.toUpperCase()} est déjà complet.`,
+          ephemeral: true,
+        });
+      }
+
       const character = interaction.fields.getTextInputValue("character").trim();
       const classe = interaction.fields.getTextInputValue("class").trim();
       const rating = Number(
@@ -502,6 +539,24 @@ module.exports = (client) => {
         });
       }
 
+      const existingIndex = event.participants.findIndex(
+        (p) => p.userId === interaction.user.id
+      );
+
+      const previousParticipant =
+        existingIndex >= 0 ? event.participants[existingIndex] : null;
+
+      if (
+        previousParticipant &&
+        previousParticipant.role !== role &&
+        isRoleFull(event, role, interaction.user.id)
+      ) {
+        return interaction.reply({
+          content: `Impossible de passer en ${role.toUpperCase()} : slot complet.`,
+          ephemeral: true,
+        });
+      }
+
       const participant = {
         userId: interaction.user.id,
         username: interaction.user.username,
@@ -511,10 +566,6 @@ module.exports = (client) => {
         role,
         joinedAt: Date.now(),
       };
-
-      const existingIndex = event.participants.findIndex(
-        (p) => p.userId === interaction.user.id
-      );
 
       if (existingIndex >= 0) {
         event.participants[existingIndex] = participant;

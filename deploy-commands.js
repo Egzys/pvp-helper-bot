@@ -96,16 +96,19 @@ const commands = [
   new SlashCommandBuilder()
     .setName("pvp-clean-expired")
     .setDescription("Supprimer manuellement les events expirés"),
+
+  new SlashCommandBuilder()
+    .setName("pvp-export")
+    .setDescription("Exporter le JSON du serveur actuel"),
 ].map((command) => command.toJSON());
 
 const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
 
 (async () => {
   try {
-    await rest.put(
-      Routes.applicationCommands(process.env.CLIENT_ID),
-      { body: commands }
-    );
+    await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), {
+      body: commands,
+    });
 
     console.log("Commandes globales déployées.");
   } catch (error) {

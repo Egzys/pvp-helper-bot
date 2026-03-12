@@ -1,93 +1,117 @@
-const fs = require("fs");
-const path = require("path");
+require("dotenv").config();
+const { REST, Routes, SlashCommandBuilder } = require("discord.js");
 
-const DATA_DIR = path.join(__dirname, "../../data");
-const GUILDS_DIR = path.join(DATA_DIR, "guilds");
+const modeChoices = [
+  { name: "RBG", value: "RBG" },
+  { name: "Solo Shuffle", value: "Solo Shuffle" },
+  { name: "3v3", value: "3v3" },
+  { name: "2v2", value: "2v2" },
+];
 
-function ensureDirs() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
+const commands = [
+  new SlashCommandBuilder()
+    .setName("pvp-create")
+    .setDescription("Créer un event PvP")
+    .addStringOption((o) =>
+      o.setName("name").setDescription("Nom de l'event").setRequired(true)
+    )
+    .addStringOption((o) =>
+      o
+        .setName("mode")
+        .setDescription("Mode PvP")
+        .setRequired(true)
+        .addChoices(...modeChoices)
+    )
+    .addStringOption((o) =>
+      o
+        .setName("date")
+        .setDescription("Date au format YYYY-MM-DD HH:mm")
+        .setRequired(true)
+    )
+    .addIntegerOption((o) =>
+      o
+        .setName("duration")
+        .setDescription("Durée en minutes (défaut: 120)")
+        .setMinValue(15)
+        .setMaxValue(720)
+        .setRequired(false)
+    ),
 
-  if (!fs.existsSync(GUILDS_DIR)) {
-    fs.mkdirSync(GUILDS_DIR, { recursive: true });
-  }
-}
+  new SlashCommandBuilder()
+    .setName("pvp-edit")
+    .setDescription("Modifier un event existant")
+    .addIntegerOption((o) =>
+      o.setName("id").setDescription("ID de l'event").setRequired(true)
+    )
+    .addStringOption((o) =>
+      o.setName("name").setDescription("Nouveau nom").setRequired(false)
+    )
+    .addStringOption((o) =>
+      o
+        .setName("mode")
+        .setDescription("Nouveau mode PvP")
+        .setRequired(false)
+        .addChoices(...modeChoices)
+    )
+    .addStringOption((o) =>
+      o
+        .setName("date")
+        .setDescription("Nouvelle date au format YYYY-MM-DD HH:mm")
+        .setRequired(false)
+    )
+    .addIntegerOption((o) =>
+      o
+        .setName("duration")
+        .setDescription("Nouvelle durée en minutes")
+        .setMinValue(15)
+        .setMaxValue(720)
+        .setRequired(false)
+    ),
 
-function getGuildFilePath(guildId) {
-  ensureDirs();
-  return path.join(GUILDS_DIR, `${guildId}.json`);
-}
+  new SlashCommandBuilder()
+    .setName("pvp-delete")
+    .setDescription("Supprimer un event par ID")
+    .addIntegerOption((o) =>
+      o.setName("id").setDescription("ID de l'event").setRequired(true)
+    ),
 
-function ensureGuildStore(guildId) {
-  const filePath = getGuildFilePath(guildId);
+  new SlashCommandBuilder()
+    .setName("pvp-list")
+    .setDescription("Afficher la liste des events")
+    .addStringOption((o) =>
+      o
+        .setName("mode")
+        .setDescription("Filtrer par mode")
+        .setRequired(false)
+        .addChoices({ name: "Tous", value: "ALL" }, ...modeChoices)
+    ),
 
-  if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(
-      filePath,
-      JSON.stringify({ nextEventId: 1, events: [] }, null, 2),
-      "utf8"
-    );
-  }
+  new SlashCommandBuilder()
+    .setName("pvp-show")
+    .setDescription("Afficher un event précis")
+    .addIntegerOption((o) =>
+      o.setName("id").setDescription("ID de l'event").setRequired(true)
+    ),
 
-  return filePath;
-}
+  new SlashCommandBuilder()
+    .setName("pvp-clean-expired")
+    .setDescription("Supprimer manuellement les events expirés"),
 
-function loadStore(guildId) {
-  const filePath = ensureGuildStore(guildId);
+  new SlashCommandBuilder()
+    .setName("pvp-export")
+    .setDescription("Exporter le JSON du serveur actuel"),
+].map((command) => command.toJSON());
 
+const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
+
+(async () => {
   try {
-    const raw = fs.readFileSync(filePath, "utf8");
-    const parsed = JSON.parse(raw);
+    await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), {
+      body: commands,
+    });
 
-    if (
-      typeof parsed !== "object" ||
-      typeof parsed.nextEventId !== "number" ||
-      !Array.isArray(parsed.events)
-    ) {
-      throw new Error("Format JSON invalide.");
-    }
-
-    return parsed;
+    console.log("Commandes globales déployées.");
   } catch (error) {
-    console.error(`Erreur lecture store guild ${guildId}:`, error);
-    return { nextEventId: 1, events: [] };
+    console.error("Erreur de déploiement :", error);
   }
-}
-
-function saveStore(guildId, store) {
-  const filePath = ensureGuildStore(guildId);
-  fs.writeFileSync(filePath, JSON.stringify(store, null, 2), "utf8");
-}
-
-function getEventById(store, eventId) {
-  return store.events.find((event) => event.id === eventId);
-}
-
-function removeEventById(store, eventId) {
-  const index = store.events.findIndex((event) => event.id === eventId);
-  if (index === -1) return null;
-
-  const [removed] = store.events.splice(index, 1);
-  return removed;
-}
-
-function listGuildFiles() {
-  ensureDirs();
-
-  return fs
-    .readdirSync(GUILDS_DIR)
-    .filter((file) => file.endsWith(".json"))
-    .map((file) => ({
-      guildId: file.replace(".json", ""),
-      path: path.join(GUILDS_DIR, file),
-    }));
-}
-
-module.exports = {
-  loadStore,
-  saveStore,
-  getEventById,
-  removeEventById,
-  listGuildFiles,
-};
+})();

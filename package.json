@@ -1,6 +1,6 @@
 {
   "name": "pvp-helper-bot",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "description": "Bot Discord PvP WoW public multi-serveurs",
   "main": "src/bot.js",
   "type": "commonjs",
