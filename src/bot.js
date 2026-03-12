@@ -8,6 +8,8 @@ const client = new Client({
 
 client.once("ready", () => {
   console.log(`Connecté en tant que ${client.user.tag}`);
+  console.log(`Serveurs : ${client.guilds.cache.size}`);
+  console.log(`Utilisateurs approximatifs : ${client.guilds.cache.reduce((a,g)=>a+g.memberCount,0)}`);
 });
 
 setupInteractionHandler(client);
