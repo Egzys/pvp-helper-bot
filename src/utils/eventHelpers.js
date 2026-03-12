@@ -6,10 +6,10 @@ const {
 } = require("discord.js");
 
 const MODE_LIMITS = {
-  RBG: { heal: 20, dps: 80 },
-  "Solo Shuffle": { heal: 20, dps: 40 },
-  "3v3": { heal: 10, dps: 20 },
-  "2v2": { heal: 10, dps: 10 },
+  RBG: { tank: 10, heal: 20, dps: 70 },
+  "Solo Shuffle": { tank: 10, heal: 20, dps: 40 },
+  "3v3": { tank: 10, heal: 10, dps: 20 },
+  "2v2": { tank: 10, heal: 10, dps: 10 },
 };
 
 const ALLOWED_MODES = Object.keys(MODE_LIMITS);
@@ -109,7 +109,7 @@ function prettyClassName(cls) {
 }
 
 function getModeLimits(mode) {
-  return MODE_LIMITS[mode] || { heal: 0, dps: 0 };
+  return MODE_LIMITS[mode] || { tank: 0, heal: 0, dps: 0 };
 }
 
 function countRole(participants, role) {
@@ -126,13 +126,6 @@ function isRoleFull(event, role, userId = null) {
   }).length;
 
   return count >= roleLimit;
-}
-
-function isEventFull(event, userId = null) {
-  return (
-    isRoleFull(event, "heal", userId) &&
-    isRoleFull(event, "dps", userId)
-  );
 }
 
 function buildRoleList(participants, role) {
@@ -154,16 +147,18 @@ function buildRoleList(participants, role) {
 function buildSummaryLine(event) {
   const status = isLocked(event) ? "VERROUILLÉ" : "OUVERT";
   const limits = getModeLimits(event.mode);
+  const tankCount = countRole(event.participants, "tank");
   const healCount = countRole(event.participants, "heal");
   const dpsCount = countRole(event.participants, "dps");
 
   return `**#${event.id}** — ${event.name} — ${event.mode} — ${formatDiscordTimestampShort(
     event.startAt
-  )} — Heal ${healCount}/${limits.heal} — DPS ${dpsCount}/${limits.dps} — ${status}`;
+  )} — Tank ${tankCount}/${limits.tank} — Heal ${healCount}/${limits.heal} — DPS ${dpsCount}/${limits.dps} — ${status}`;
 }
 
 function buildEventEmbed(event) {
   const limits = getModeLimits(event.mode);
+  const tankCount = countRole(event.participants, "tank");
   const healCount = countRole(event.participants, "heal");
   const dpsCount = countRole(event.participants, "dps");
   const locked = isLocked(event);
@@ -186,6 +181,11 @@ function buildEventEmbed(event) {
         inline: true,
       },
       {
+        name: "Tanks",
+        value: `**${tankCount}/${limits.tank}**`,
+        inline: true,
+      },
+      {
         name: "Heals",
         value: `**${healCount}/${limits.heal}**`,
         inline: true,
@@ -193,6 +193,11 @@ function buildEventEmbed(event) {
       {
         name: "DPS",
         value: `**${dpsCount}/${limits.dps}**`,
+        inline: true,
+      },
+      {
+        name: "Liste Tank",
+        value: buildRoleList(event.participants, "tank"),
         inline: true,
       },
       {
@@ -210,10 +215,16 @@ function buildEventEmbed(event) {
 }
 
 function buildEventButtons(event, locked = false) {
+  const tankFull = isRoleFull(event, "tank");
   const healFull = isRoleFull(event, "heal");
   const dpsFull = isRoleFull(event, "dps");
 
   return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`join_${event.id}_tank`)
+      .setLabel(tankFull ? "Tank (complet)" : "Tank")
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(locked || tankFull),
     new ButtonBuilder()
       .setCustomId(`join_${event.id}_heal`)
       .setLabel(healFull ? "Heal (complet)" : "Heal")
@@ -252,7 +263,6 @@ module.exports = {
   getModeLimits,
   countRole,
   isRoleFull,
-  isEventFull,
   buildRoleList,
   buildSummaryLine,
   buildEventEmbed,
