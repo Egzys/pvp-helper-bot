@@ -1,6 +1,13 @@
 require("dotenv").config();
 const { REST, Routes, SlashCommandBuilder } = require("discord.js");
 
+const modeChoices = [
+  { name: "RBG", value: "RBG" },
+  { name: "Solo Shuffle", value: "Solo Shuffle" },
+  { name: "3v3", value: "3v3" },
+  { name: "2v2", value: "2v2" },
+];
+
 const commands = [
   new SlashCommandBuilder()
     .setName("pvp-create")
@@ -13,17 +20,12 @@ const commands = [
         .setName("mode")
         .setDescription("Mode PvP")
         .setRequired(true)
-        .addChoices(
-          { name: "RBG", value: "RBG" },
-          { name: "Solo Shuffle", value: "Solo Shuffle" },
-          { name: "3v3", value: "3v3" },
-          { name: "2v2", value: "2v2" }
-        )
+        .addChoices(...modeChoices)
     )
     .addStringOption((o) =>
       o
         .setName("date")
-        .setDescription("Date de l'event au format YYYY-MM-DD HH:mm")
+        .setDescription("Date au format YYYY-MM-DD HH:mm")
         .setRequired(true)
     )
     .addIntegerOption((o) =>
@@ -36,8 +38,39 @@ const commands = [
     ),
 
   new SlashCommandBuilder()
+    .setName("pvp-edit")
+    .setDescription("Modifier un event existant")
+    .addIntegerOption((o) =>
+      o.setName("id").setDescription("ID de l'event").setRequired(true)
+    )
+    .addStringOption((o) =>
+      o.setName("name").setDescription("Nouveau nom").setRequired(false)
+    )
+    .addStringOption((o) =>
+      o
+        .setName("mode")
+        .setDescription("Nouveau mode PvP")
+        .setRequired(false)
+        .addChoices(...modeChoices)
+    )
+    .addStringOption((o) =>
+      o
+        .setName("date")
+        .setDescription("Nouvelle date au format YYYY-MM-DD HH:mm")
+        .setRequired(false)
+    )
+    .addIntegerOption((o) =>
+      o
+        .setName("duration")
+        .setDescription("Nouvelle durée en minutes")
+        .setMinValue(15)
+        .setMaxValue(720)
+        .setRequired(false)
+    ),
+
+  new SlashCommandBuilder()
     .setName("pvp-delete")
-    .setDescription("Supprimer un event PvP par ID")
+    .setDescription("Supprimer un event par ID")
     .addIntegerOption((o) =>
       o.setName("id").setDescription("ID de l'event").setRequired(true)
     ),
@@ -50,44 +83,31 @@ const commands = [
         .setName("mode")
         .setDescription("Filtrer par mode")
         .setRequired(false)
-        .addChoices(
-          { name: "Tous", value: "ALL" },
-          { name: "RBG", value: "RBG" },
-          { name: "Solo Shuffle", value: "Solo Shuffle" },
-          { name: "3v3", value: "3v3" },
-          { name: "2v2", value: "2v2" }
-        )
+        .addChoices({ name: "Tous", value: "ALL" }, ...modeChoices)
     ),
 
   new SlashCommandBuilder()
     .setName("pvp-show")
-    .setDescription("Afficher les détails d'un event")
+    .setDescription("Afficher un event précis")
     .addIntegerOption((o) =>
       o.setName("id").setDescription("ID de l'event").setRequired(true)
     ),
 
   new SlashCommandBuilder()
     .setName("pvp-clean-expired")
-    .setDescription("Supprimer manuellement tous les events expirés"),
+    .setDescription("Supprimer manuellement les events expirés"),
 ].map((command) => command.toJSON());
 
 const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
 
 (async () => {
   try {
-    const guildIds = process.env.GUILD_ID.split(",").map((id) => id.trim());
+    await rest.put(
+      Routes.applicationCommands(process.env.CLIENT_ID),
+      { body: commands }
+    );
 
-    console.log("Début du déploiement des commandes...");
-
-    for (const guildId of guildIds) {
-      await rest.put(
-        Routes.applicationGuildCommands(process.env.CLIENT_ID, guildId),
-        { body: commands }
-      );
-      console.log(`Commandes déployées pour le serveur : ${guildId}`);
-    }
-
-    console.log("Déploiement terminé.");
+    console.log("Commandes globales déployées.");
   } catch (error) {
     console.error("Erreur de déploiement :", error);
   }

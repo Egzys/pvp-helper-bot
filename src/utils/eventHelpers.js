@@ -8,9 +8,8 @@ const {
 const ALLOWED_MODES = ["RBG", "Solo Shuffle", "3v3", "2v2"];
 
 function parseEventDate(input) {
-  // Format attendu: YYYY-MM-DD HH:mm
   const regex = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/;
-  const match = input.match(regex);
+  const match = String(input || "").trim().match(regex);
 
   if (!match) {
     return { ok: false, error: "Format invalide. Utilise YYYY-MM-DD HH:mm" };
@@ -24,18 +23,10 @@ function parseEventDate(input) {
   const hour = Number(hourStr);
   const minute = Number(minuteStr);
 
-  if (month < 1 || month > 12) {
-    return { ok: false, error: "Mois invalide." };
-  }
-  if (day < 1 || day > 31) {
-    return { ok: false, error: "Jour invalide." };
-  }
-  if (hour < 0 || hour > 23) {
-    return { ok: false, error: "Heure invalide." };
-  }
-  if (minute < 0 || minute > 59) {
-    return { ok: false, error: "Minute invalide." };
-  }
+  if (month < 1 || month > 12) return { ok: false, error: "Mois invalide." };
+  if (day < 1 || day > 31) return { ok: false, error: "Jour invalide." };
+  if (hour < 0 || hour > 23) return { ok: false, error: "Heure invalide." };
+  if (minute < 0 || minute > 59) return { ok: false, error: "Minute invalide." };
 
   const date = new Date(year, month - 1, day, hour, minute, 0, 0);
 
@@ -70,6 +61,10 @@ function isExpired(event) {
   return Date.now() >= event.endAt;
 }
 
+function isLocked(event) {
+  return Date.now() >= event.startAt;
+}
+
 function sortParticipants(participants) {
   participants.sort((a, b) => b.rating - a.rating);
 }
@@ -82,23 +77,23 @@ function normalizeClassName(input) {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
-function emojiClass(cls) {
+function prettyClassName(cls) {
   const normalized = normalizeClassName(cls);
 
   const map = {
-    guerrier: "⚔️ Guerrier",
-    mage: "❄️ Mage",
-    pretre: "✝️ Prêtre",
-    druide: "🌿 Druide",
-    voleur: "🗡️ Voleur",
-    chasseur: "🏹 Chasseur",
-    demoniste: "🔥 Démoniste",
-    paladin: "🛡️ Paladin",
-    chaman: "⚡ Chaman",
-    monk: "🍃 Moine",
-    demonhunter: "👁️ DH",
-    dh: "👁️ DH",
-    evocateur: "🐉 Evoker",
+    guerrier: "Guerrier",
+    mage: "Mage",
+    pretre: "Prêtre",
+    druide: "Druide",
+    voleur: "Voleur",
+    chasseur: "Chasseur",
+    demoniste: "Démoniste",
+    paladin: "Paladin",
+    chaman: "Chaman",
+    moine: "Moine",
+    demonhunter: "DH",
+    dh: "DH",
+    evocateur: "Evoker",
   };
 
   return map[normalized] || cls;
@@ -115,38 +110,48 @@ function buildRoleList(participants, role) {
 
   return filtered
     .map((p, index) => {
-      return `**${index + 1}.** ${emojiClass(p.class)} — **${p.character}** — **${p.rating}**`;
+      return `**${index + 1}.** ${prettyClassName(p.class)} — **${p.character}** — **${p.rating}**`;
     })
     .join("\n");
 }
 
 function buildSummaryLine(event) {
+  const status = isLocked(event) ? "VERROUILLÉ" : "OUVERT";
   return `**#${event.id}** — ${event.name} — ${event.mode} — ${formatDiscordTimestampShort(
     event.startAt
-  )} — ${event.participants.length} inscrit(s)`;
+  )} — ${event.participants.length} inscrit(s) — ${status}`;
 }
 
 function buildEventEmbed(event) {
   const healCount = event.participants.filter((p) => p.role === "heal").length;
   const dpsCount = event.participants.filter((p) => p.role === "dps").length;
+  const locked = isLocked(event);
 
   return new EmbedBuilder()
     .setTitle(`PvP Event #${event.id} — ${event.name}`)
-    .setColor("#1927a3")
-    .setDescription("Inscrivez-vous avec les boutons ci-dessous.")
+    .setColor(locked ? 0x8b0000 : 0x1927a3)
+    .setDescription(
+      locked
+        ? "Les inscriptions sont verrouillées. L'event a commencé."
+        : "Inscrivez-vous avec les boutons ci-dessous."
+    )
     .addFields(
       { name: "Mode", value: event.mode, inline: true },
       { name: "Début", value: formatDiscordTimestamp(event.startAt), inline: true },
+      { name: "Fin", value: formatDiscordTimestamp(event.endAt), inline: true },
       {
-        name: "Fin",
-        value: formatDiscordTimestamp(event.endAt),
+        name: "Statut",
+        value: locked ? "Verrouillé" : "Ouvert",
         inline: true,
       },
-      { name: "Heals", value: `Total: **${healCount}**`, inline: true },
-      { name: "DPS", value: `Total: **${dpsCount}**`, inline: true },
       {
-        name: "Total inscrits",
-        value: `**${event.participants.length}**`,
+        name: "Heals",
+        value: `**${healCount}**`,
+        inline: true,
+      },
+      {
+        name: "DPS",
+        value: `**${dpsCount}**`,
         inline: true,
       },
       {
@@ -158,30 +163,28 @@ function buildEventEmbed(event) {
         name: "Liste DPS",
         value: buildRoleList(event.participants, "dps"),
         inline: true,
-      },
-      {
-        name: "Important",
-        value:
-          "Classe en français sans accent : guerrier, mage, pretre, druide, voleur, chasseur, demoniste, paladin, chaman, moine, demonhunter, evoker.",
       }
     )
     .setFooter({ text: `ID event: ${event.id}` });
 }
 
-function buildEventButtons(eventId) {
+function buildEventButtons(eventId, locked = false) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`join_${eventId}_heal`)
       .setLabel("Heal")
-      .setStyle(ButtonStyle.Success),
+      .setStyle(ButtonStyle.Success)
+      .setDisabled(locked),
     new ButtonBuilder()
       .setCustomId(`join_${eventId}_dps`)
       .setLabel("DPS")
-      .setStyle(ButtonStyle.Danger),
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(locked),
     new ButtonBuilder()
       .setCustomId(`leave_${eventId}`)
       .setLabel("Quitter l'event")
       .setStyle(ButtonStyle.Secondary)
+      .setDisabled(locked)
   );
 }
 
@@ -197,9 +200,11 @@ module.exports = {
   formatDiscordTimestamp,
   formatDiscordTimestampShort,
   isExpired,
+  isLocked,
   sortParticipants,
   normalizeClassName,
-  emojiClass,
+  prettyClassName,
+  buildRoleList,
   buildSummaryLine,
   buildEventEmbed,
   buildEventButtons,

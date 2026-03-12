@@ -11,17 +11,25 @@ const {
   saveStore,
   getEventById,
   removeEventById,
+  listGuildFiles,
 } = require("../utils/eventStore");
 
 const {
   parseEventDate,
   isExpired,
+  isLocked,
   sortParticipants,
   buildSummaryLine,
   buildEventEmbed,
   buildEventButtons,
   sanitizeMode,
 } = require("../utils/eventHelpers");
+
+function isAdmin(interaction) {
+  return interaction.member.permissions.has(
+    PermissionsBitField.Flags.Administrator
+  );
+}
 
 async function safeDeleteDiscordMessage(client, event) {
   try {
@@ -47,15 +55,15 @@ async function refreshEventMessage(client, event) {
 
     await message.edit({
       embeds: [buildEventEmbed(event)],
-      components: [buildEventButtons(event.id)],
+      components: [buildEventButtons(event.id, isLocked(event))],
     });
   } catch (error) {
     console.error(`Impossible de mettre à jour l'event #${event.id}`, error);
   }
 }
 
-async function deleteExpiredEvents(client) {
-  const store = loadStore();
+async function deleteExpiredEventsForGuild(client, guildId) {
+  const store = loadStore(guildId);
   const expired = store.events.filter(isExpired);
 
   if (!expired.length) return 0;
@@ -65,35 +73,49 @@ async function deleteExpiredEvents(client) {
   }
 
   store.events = store.events.filter((event) => !isExpired(event));
-  saveStore(store);
+  saveStore(guildId, store);
 
   return expired.length;
 }
 
-function startAutoCleanup(client) {
-  // nettoyage au démarrage
-  deleteExpiredEvents(client).catch(console.error);
+async function refreshGuildEvents(client, guildId) {
+  const store = loadStore(guildId);
 
-  // nettoyage toutes les 60 secondes
+  for (const event of store.events) {
+    if (isExpired(event)) continue;
+    await refreshEventMessage(client, event);
+  }
+}
+
+async function cleanupAllGuilds(client) {
+  const guildFiles = listGuildFiles();
+
+  for (const file of guildFiles) {
+    await deleteExpiredEventsForGuild(client, file.guildId);
+    await refreshGuildEvents(client, file.guildId);
+  }
+}
+
+function startBackgroundMaintenance(client) {
+  cleanupAllGuilds(client).catch(console.error);
+
   setInterval(() => {
-    deleteExpiredEvents(client).catch(console.error);
+    cleanupAllGuilds(client).catch(console.error);
   }, 60_000);
 }
 
 module.exports = (client) => {
-  startAutoCleanup(client);
+  startBackgroundMaintenance(client);
 
   client.on("interactionCreate", async (interaction) => {
-    const store = loadStore();
+    if (!interaction.guildId) return;
 
-    // COMMANDES
+    const guildId = interaction.guildId;
+    const store = loadStore(guildId);
+
     if (interaction.isChatInputCommand()) {
       if (interaction.commandName === "pvp-create") {
-        if (
-          !interaction.member.permissions.has(
-            PermissionsBitField.Flags.Administrator
-          )
-        ) {
+        if (!isAdmin(interaction)) {
           return interaction.reply({
             content: "Tu dois être administrateur pour créer un event.",
             ephemeral: true,
@@ -129,7 +151,6 @@ module.exports = (client) => {
           name,
           mode,
           participants: [],
-          guildId: interaction.guildId,
           channelId: interaction.channelId,
           messageId: null,
           createdAt: Date.now(),
@@ -140,24 +161,134 @@ module.exports = (client) => {
 
         const reply = await interaction.reply({
           embeds: [buildEventEmbed(event)],
-          components: [buildEventButtons(event.id)],
+          components: [buildEventButtons(event.id, false)],
           fetchReply: true,
         });
 
         event.messageId = reply.id;
         store.events.push(event);
-        saveStore(store);
+        saveStore(guildId, store);
+
         return;
       }
 
-      if (interaction.commandName === "pvp-list") {
-        const requestedMode = sanitizeMode(interaction.options.getString("mode") || "ALL");
+      if (interaction.commandName === "pvp-edit") {
+        if (!isAdmin(interaction)) {
+          return interaction.reply({
+            content: "Tu dois être administrateur pour modifier un event.",
+            ephemeral: true,
+          });
+        }
 
-        let events = store.events.filter((e) => e.guildId === interaction.guildId);
-        events = events.filter((e) => !isExpired(e));
+        const eventId = interaction.options.getInteger("id");
+        const event = getEventById(store, eventId);
+
+        if (!event) {
+          return interaction.reply({
+            content: `Aucun event trouvé avec l'ID #${eventId}.`,
+            ephemeral: true,
+          });
+        }
+
+        const newName = interaction.options.getString("name");
+        const newMode = interaction.options.getString("mode");
+        const newDate = interaction.options.getString("date");
+        const newDuration = interaction.options.getInteger("duration");
+
+        if (!newName && !newMode && !newDate && !newDuration) {
+          return interaction.reply({
+            content: "Tu dois modifier au moins un champ.",
+            ephemeral: true,
+          });
+        }
+
+        if (newName) {
+          event.name = newName;
+        }
+
+        if (newMode) {
+          event.mode = newMode;
+        }
+
+        let startAt = event.startAt;
+        let durationMinutes = event.durationMinutes;
+
+        if (newDate) {
+          const parsed = parseEventDate(newDate);
+
+          if (!parsed.ok) {
+            return interaction.reply({
+              content: parsed.error,
+              ephemeral: true,
+            });
+          }
+
+          startAt = parsed.date.getTime();
+        }
+
+        if (newDuration) {
+          durationMinutes = newDuration;
+        }
+
+        const endAt = startAt + durationMinutes * 60 * 1000;
+
+        if (startAt <= Date.now()) {
+          return interaction.reply({
+            content: "La nouvelle date doit être dans le futur.",
+            ephemeral: true,
+          });
+        }
+
+        event.startAt = startAt;
+        event.durationMinutes = durationMinutes;
+        event.endAt = endAt;
+
+        saveStore(guildId, store);
+        await refreshEventMessage(client, event);
+
+        return interaction.reply({
+          content: `Event #${event.id} modifié.`,
+          ephemeral: true,
+        });
+      }
+
+      if (interaction.commandName === "pvp-delete") {
+        if (!isAdmin(interaction)) {
+          return interaction.reply({
+            content: "Tu dois être administrateur pour supprimer un event.",
+            ephemeral: true,
+          });
+        }
+
+        const eventId = interaction.options.getInteger("id");
+        const event = getEventById(store, eventId);
+
+        if (!event) {
+          return interaction.reply({
+            content: `Aucun event trouvé avec l'ID #${eventId}.`,
+            ephemeral: true,
+          });
+        }
+
+        await safeDeleteDiscordMessage(client, event);
+        removeEventById(store, eventId);
+        saveStore(guildId, store);
+
+        return interaction.reply({
+          content: `Event #${eventId} supprimé.`,
+          ephemeral: true,
+        });
+      }
+
+      if (interaction.commandName === "pvp-list") {
+        const requestedMode = sanitizeMode(
+          interaction.options.getString("mode") || "ALL"
+        );
+
+        let events = store.events.filter((event) => !isExpired(event));
 
         if (requestedMode && requestedMode !== "ALL") {
-          events = events.filter((e) => e.mode === requestedMode);
+          events = events.filter((event) => event.mode === requestedMode);
         }
 
         events.sort((a, b) => a.startAt - b.startAt);
@@ -169,10 +300,8 @@ module.exports = (client) => {
           });
         }
 
-        const content = events.map(buildSummaryLine).join("\n");
-
         return interaction.reply({
-          content,
+          content: events.map(buildSummaryLine).join("\n"),
           ephemeral: true,
         });
       }
@@ -181,7 +310,7 @@ module.exports = (client) => {
         const eventId = interaction.options.getInteger("id");
         const event = getEventById(store, eventId);
 
-        if (!event || event.guildId !== interaction.guildId) {
+        if (!event) {
           return interaction.reply({
             content: `Aucun event trouvé avec l'ID #${eventId}.`,
             ephemeral: true,
@@ -201,60 +330,23 @@ module.exports = (client) => {
         });
       }
 
-      if (interaction.commandName === "pvp-delete") {
-        if (
-          !interaction.member.permissions.has(
-            PermissionsBitField.Flags.Administrator
-          )
-        ) {
-          return interaction.reply({
-            content: "Tu dois être administrateur pour supprimer un event.",
-            ephemeral: true,
-          });
-        }
-
-        const eventId = interaction.options.getInteger("id");
-        const event = getEventById(store, eventId);
-
-        if (!event || event.guildId !== interaction.guildId) {
-          return interaction.reply({
-            content: `Aucun event trouvé avec l'ID #${eventId}.`,
-            ephemeral: true,
-          });
-        }
-
-        await safeDeleteDiscordMessage(client, event);
-        removeEventById(store, eventId);
-        saveStore(store);
-
-        return interaction.reply({
-          content: `Event #${eventId} supprimé.`,
-          ephemeral: true,
-        });
-      }
-
       if (interaction.commandName === "pvp-clean-expired") {
-        if (
-          !interaction.member.permissions.has(
-            PermissionsBitField.Flags.Administrator
-          )
-        ) {
+        if (!isAdmin(interaction)) {
           return interaction.reply({
             content: "Tu dois être administrateur pour lancer ce nettoyage.",
             ephemeral: true,
           });
         }
 
-        const count = await deleteExpiredEvents(client);
+        const deletedCount = await deleteExpiredEventsForGuild(client, guildId);
 
         return interaction.reply({
-          content: `${count} event(s) expiré(s) supprimé(s).`,
+          content: `${deletedCount} event(s) expiré(s) supprimé(s).`,
           ephemeral: true,
         });
       }
     }
 
-    // BOUTONS
     if (interaction.isButton()) {
       const parts = interaction.customId.split("_");
 
@@ -263,7 +355,7 @@ module.exports = (client) => {
         const role = parts[2];
         const event = getEventById(store, eventId);
 
-        if (!event || event.guildId !== interaction.guildId) {
+        if (!event) {
           return interaction.reply({
             content: "Cet event n'existe pas.",
             ephemeral: true,
@@ -277,11 +369,18 @@ module.exports = (client) => {
           });
         }
 
+        if (isLocked(event)) {
+          return interaction.reply({
+            content: "Les inscriptions sont verrouillées pour cet event.",
+            ephemeral: true,
+          });
+        }
+
         const modal = new ModalBuilder()
           .setCustomId(`signup_${eventId}_${role}`)
           .setTitle(`Inscription : ${event.name}`);
 
-        const charInput = new TextInputBuilder()
+        const characterInput = new TextInputBuilder()
           .setCustomId("character")
           .setLabel("Nom du perso")
           .setStyle(TextInputStyle.Short)
@@ -290,7 +389,7 @@ module.exports = (client) => {
 
         const classInput = new TextInputBuilder()
           .setCustomId("class")
-          .setLabel("Classe (français sans accent)")
+          .setLabel("Classe")
           .setStyle(TextInputStyle.Short)
           .setRequired(true)
           .setMaxLength(32);
@@ -303,7 +402,7 @@ module.exports = (client) => {
           .setMaxLength(4);
 
         modal.addComponents(
-          new ActionRowBuilder().addComponents(charInput),
+          new ActionRowBuilder().addComponents(characterInput),
           new ActionRowBuilder().addComponents(classInput),
           new ActionRowBuilder().addComponents(ratingInput)
         );
@@ -315,7 +414,7 @@ module.exports = (client) => {
         const eventId = Number(parts[1]);
         const event = getEventById(store, eventId);
 
-        if (!event || event.guildId !== interaction.guildId) {
+        if (!event) {
           return interaction.reply({
             content: "Cet event n'existe pas.",
             ephemeral: true,
@@ -329,13 +428,20 @@ module.exports = (client) => {
           });
         }
 
-        const before = event.participants.length;
+        if (isLocked(event)) {
+          return interaction.reply({
+            content: "Les désinscriptions sont verrouillées car l'event a commencé.",
+            ephemeral: true,
+          });
+        }
+
+        const beforeCount = event.participants.length;
 
         event.participants = event.participants.filter(
-          (p) => p.userId !== interaction.user.id
+          (participant) => participant.userId !== interaction.user.id
         );
 
-        if (event.participants.length === before) {
+        if (event.participants.length === beforeCount) {
           return interaction.reply({
             content: "Tu n'étais pas inscrit à cet event.",
             ephemeral: true,
@@ -343,7 +449,7 @@ module.exports = (client) => {
         }
 
         sortParticipants(event.participants);
-        saveStore(store);
+        saveStore(guildId, store);
         await refreshEventMessage(client, event);
 
         return interaction.reply({
@@ -353,7 +459,6 @@ module.exports = (client) => {
       }
     }
 
-    // MODAL
     if (interaction.isModalSubmit()) {
       const parts = interaction.customId.split("_");
 
@@ -361,10 +466,9 @@ module.exports = (client) => {
 
       const eventId = Number(parts[1]);
       const role = parts[2];
-
       const event = getEventById(store, eventId);
 
-      if (!event || event.guildId !== interaction.guildId) {
+      if (!event) {
         return interaction.reply({
           content: "Cet event n'existe pas.",
           ephemeral: true,
@@ -374,6 +478,13 @@ module.exports = (client) => {
       if (isExpired(event)) {
         return interaction.reply({
           content: "Cet event est expiré.",
+          ephemeral: true,
+        });
+      }
+
+      if (isLocked(event)) {
+        return interaction.reply({
+          content: "Les inscriptions sont verrouillées pour cet event.",
           ephemeral: true,
         });
       }
@@ -412,7 +523,7 @@ module.exports = (client) => {
       }
 
       sortParticipants(event.participants);
-      saveStore(store);
+      saveStore(guildId, store);
       await refreshEventMessage(client, event);
 
       return interaction.reply({

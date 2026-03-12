@@ -1,6 +1,7 @@
 {
-  "name": "pvp-raid-helper-bot",
-  "version": "2.0.0",
+  "name": "pvp-helper-bot",
+  "version": "3.0.0",
+  "description": "Bot Discord PvP WoW public multi-serveurs",
   "main": "src/bot.js",
   "type": "commonjs",
   "scripts": {
