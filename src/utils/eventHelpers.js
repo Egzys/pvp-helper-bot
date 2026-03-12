@@ -6,10 +6,10 @@ const {
 } = require("discord.js");
 
 const MODE_LIMITS = {
-  RBG: { heal: 2, dps: 8 },
-  "Solo Shuffle": { heal: 2, dps: 4 },
-  "3v3": { heal: 1, dps: 2 },
-  "2v2": { heal: 1, dps: 1 },
+  RBG: { heal: 20, dps: 80 },
+  "Solo Shuffle": { heal: 20, dps: 40 },
+  "3v3": { heal: 10, dps: 20 },
+  "2v2": { heal: 10, dps: 10 },
 };
 
 const ALLOWED_MODES = Object.keys(MODE_LIMITS);
