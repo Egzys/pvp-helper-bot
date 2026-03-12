@@ -18,19 +18,19 @@ const ALLOWED_MODES = Object.keys(MODE_LIMITS);
   Remplace les IDs ci-dessous par TES vrais emojis custom Discord.
 */
 const CLASS_EMOJIS = {
-  warrior: "<:warrior~1:>",
-  paladin: "<:paladin~1:>",
-  hunter: "<:hunt~1:>",
-  rogue: "<:rogue~1:>",
-  priest: "<:priest~1:>",
-  deathknight: "<:dk~1:>",
-  shaman: "<:sham:>",
-  mage: "<:mage~2:>",
-  warlock: "<:warlock~1:>",
-  monk: "<:monk~1:>",
-  druid: "<:drood:>",
-  demonhunter: "<:dh~1:>",
-  evoker: "<:evok:>",
+  warrior: "<:warrior~1:1481704387117060238>",
+  paladin: "<:paladin~1:1481704188584136974>",
+  hunter: "<:hunt~1:1481704077359452161>",
+  rogue: "<:rogue~1:1481704264828190830>",
+  priest: "<:priest~1:1481704225393082629>",
+  deathknight: "<:dk~1:1481704008505888889>",
+  shaman: "<:sham:1481704310663544984>",
+  mage: "<:mage~2:1481704115057983519>",
+  warlock: "<:warlock~1:1481704353197985873>",
+  monk: "<:monk~1:1481704154085855393>",
+  druid: "<:drood:1481703822752612472>",
+  demonhunter: "<:dh~1:1481703971226910982>",
+  evoker: "<:evok:1481703775247794381>",
 };
 
 function parseEventDate(input) {
