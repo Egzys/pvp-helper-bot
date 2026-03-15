@@ -354,6 +354,95 @@ function sanitizeMode(mode) {
   if (mode === "ALL") return "ALL";
   return ALLOWED_MODES.includes(mode) ? mode : null;
 }
+function countInterestRole(entries, role) {
+  return entries.filter((p) => p.role === role).length;
+}
+
+function buildInterestRoleList(entries, role) {
+  const filtered = entries
+    .filter((p) => p.role === role)
+    .sort((a, b) => b.rating - a.rating);
+
+  if (!filtered.length) {
+    return "Aucun";
+  }
+
+  return filtered
+    .map((p, index) => {
+      return `**${index + 1}.** ${getClassDisplay(p.class)} — **${p.character}** — **${p.rating}**`;
+    })
+    .join("\n");
+}
+
+function buildInterestEmbed(interest) {
+  const tankCount = countInterestRole(interest.entries, "tank");
+  const healCount = countInterestRole(interest.entries, "heal");
+  const dpsCount = countInterestRole(interest.entries, "dps");
+
+  return new EmbedBuilder()
+    .setTitle(interest.title)
+    .setColor(0x5865f2)
+    .setDescription("Inscrivez-vous si vous êtes intéressé pour faire du RBG.")
+    .addFields(
+      {
+        name: "Tanks",
+        value: `**${tankCount}**`,
+        inline: true,
+      },
+      {
+        name: "Heals",
+        value: `**${healCount}**`,
+        inline: true,
+      },
+      {
+        name: "DPS",
+        value: `**${dpsCount}**`,
+        inline: true,
+      },
+      {
+        name: "Liste Tank",
+        value: buildInterestRoleList(interest.entries, "tank"),
+        inline: true,
+      },
+      {
+        name: "Liste Heal",
+        value: buildInterestRoleList(interest.entries, "heal"),
+        inline: true,
+      },
+      {
+        name: "\u200B",
+        value: "\u200B",
+        inline: true,
+      },
+      {
+        name: "Liste DPS",
+        value: buildInterestRoleList(interest.entries, "dps"),
+        inline: false,
+      }
+    )
+    .setFooter({ text: `ID interest: ${interest.id}` });
+}
+
+function buildInterestButtons(interestId) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`interest_join_${interestId}_tank`)
+      .setLabel("Tank")
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(`interest_join_${interestId}_heal`)
+      .setLabel("Heal")
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId(`interest_join_${interestId}_dps`)
+      .setLabel("DPS")
+      .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId(`interest_leave_${interestId}`)
+      .setLabel("Quitter")
+      .setStyle(ButtonStyle.Secondary)
+  );
+}
 
 module.exports = {
   MODE_LIMITS,
@@ -378,4 +467,8 @@ module.exports = {
   buildEventEmbed,
   buildEventButtons,
   sanitizeMode,
+  countInterestRole,
+  buildInterestRoleList,
+  buildInterestEmbed,
+  buildInterestButtons,
 };

@@ -12,6 +12,8 @@ const {
   saveStore,
   getEventById,
   removeEventById,
+  getInterestById,
+  removeInterestById,
   listGuildFiles,
   getGuildFilePath,
 } = require("../utils/eventStore");
@@ -24,6 +26,8 @@ const {
   buildSummaryLine,
   buildEventEmbed,
   buildEventButtons,
+  buildInterestEmbed,
+  buildInterestButtons,
   sanitizeMode,
   isRoleFull,
 } = require("../utils/eventHelpers");
@@ -42,7 +46,7 @@ async function safeDeleteDiscordMessage(client, event) {
     const message = await channel.messages.fetch(event.messageId);
     if (!message) return;
 
-    await message.delete().catch(() => {});
+    await message.delete().catch(() => { });
   } catch (error) {
     console.error(`Impossible de supprimer le message de l'event #${event.id}`, error);
   }
@@ -105,6 +109,23 @@ function startBackgroundMaintenance(client) {
   setInterval(() => {
     cleanupAllGuilds(client).catch(console.error);
   }, 60_000);
+}
+
+async function refreshInterestMessage(client, interest) {
+  try {
+    const channel = await client.channels.fetch(interest.channelId);
+    if (!channel) return;
+
+    const message = await channel.messages.fetch(interest.messageId);
+    if (!message) return;
+
+    await message.edit({
+      embeds: [buildInterestEmbed(interest)],
+      components: [buildInterestButtons(interest.id)],
+    });
+  } catch (error) {
+    console.error(`Impossible de mettre à jour l'interest #${interest.id}`, error);
+  }
 }
 
 module.exports = (client) => {
@@ -368,6 +389,84 @@ module.exports = (client) => {
           ephemeral: true,
         });
       }
+
+      if (interaction.commandName === "rbg-interest-create") {
+        if (!isAdmin(interaction)) {
+          return interaction.reply({
+            content: "Tu dois être administrateur pour créer ce tableau.",
+            ephemeral: true,
+          });
+        }
+
+        const title = interaction.options.getString("title");
+
+        const interest = {
+          id: store.nextInterestId++,
+          title,
+          entries: [],
+          channelId: interaction.channelId,
+          messageId: null,
+          createdAt: Date.now(),
+        };
+
+        const reply = await interaction.reply({
+          embeds: [buildInterestEmbed(interest)],
+          components: [buildInterestButtons(interest.id)],
+          fetchReply: true,
+        });
+
+        interest.messageId = reply.id;
+        store.interests.push(interest);
+        saveStore(guildId, store);
+
+        return;
+      }
+
+      if (interaction.commandName === "rbg-interest-list") {
+        if (!store.interests.length) {
+          return interaction.reply({
+            content: "Aucun tableau d'intérêt actif.",
+            ephemeral: true,
+          });
+        }
+
+        const lines = store.interests
+          .sort((a, b) => a.id - b.id)
+          .map((item) => `**#${item.id}** — ${item.title} — ${item.entries.length} inscription(s)`);
+
+        return interaction.reply({
+          content: lines.join("\n"),
+          ephemeral: true,
+        });
+      }
+
+      if (interaction.commandName === "rbg-interest-delete") {
+        if (!isAdmin(interaction)) {
+          return interaction.reply({
+            content: "Tu dois être administrateur pour supprimer ce tableau.",
+            ephemeral: true,
+          });
+        }
+
+        const interestId = interaction.options.getInteger("id");
+        const interest = getInterestById(store, interestId);
+
+        if (!interest) {
+          return interaction.reply({
+            content: `Aucun tableau trouvé avec l'ID #${interestId}.`,
+            ephemeral: true,
+          });
+        }
+
+        await safeDeleteDiscordMessage(client, interest);
+        removeInterestById(store, interestId);
+        saveStore(guildId, store);
+
+        return interaction.reply({
+          content: `Tableau d'intérêt #${interestId} supprimé.`,
+          ephemeral: true,
+        });
+      }
     }
 
     if (interaction.isButton()) {
@@ -487,6 +586,85 @@ module.exports = (client) => {
           ephemeral: true,
         });
       }
+
+      if (parts[0] === "interest" && parts[1] === "join") {
+        const interestId = Number(parts[2]);
+        const role = parts[3];
+        const interest = getInterestById(store, interestId);
+
+        if (!interest) {
+          return interaction.reply({
+            content: "Ce tableau n'existe pas.",
+            ephemeral: true,
+          });
+        }
+
+        const modal = new ModalBuilder()
+          .setCustomId(`interest_signup_${interestId}_${role}`)
+          .setTitle(`Inscription : ${interest.title}`);
+
+        const characterInput = new TextInputBuilder()
+          .setCustomId("character")
+          .setLabel("Nom du perso")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMaxLength(32);
+
+        const classInput = new TextInputBuilder()
+          .setCustomId("class")
+          .setLabel("Classe")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMaxLength(32);
+
+        const ratingInput = new TextInputBuilder()
+          .setCustomId("rating")
+          .setLabel("Rating (0-4000)")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMaxLength(4);
+
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(characterInput),
+          new ActionRowBuilder().addComponents(classInput),
+          new ActionRowBuilder().addComponents(ratingInput)
+        );
+
+        return interaction.showModal(modal);
+      }
+
+      if (parts[0] === "interest" && parts[1] === "leave") {
+        const interestId = Number(parts[2]);
+        const interest = getInterestById(store, interestId);
+
+        if (!interest) {
+          return interaction.reply({
+            content: "Ce tableau n'existe pas.",
+            ephemeral: true,
+          });
+        }
+
+        const before = interest.entries.length;
+
+        interest.entries = interest.entries.filter(
+          (entry) => entry.userId !== interaction.user.id
+        );
+
+        if (interest.entries.length === before) {
+          return interaction.reply({
+            content: "Tu n'étais inscrit sur aucun rôle dans ce tableau.",
+            ephemeral: true,
+          });
+        }
+
+        saveStore(guildId, store);
+        await refreshInterestMessage(client, interest);
+
+        return interaction.reply({
+          content: `Tu as quitté le tableau #${interest.id}.`,
+          ephemeral: true,
+        });
+      }
     }
 
     if (interaction.isModalSubmit()) {
@@ -497,6 +675,62 @@ module.exports = (client) => {
       const eventId = Number(parts[1]);
       const role = parts[2];
       const event = getEventById(store, eventId);
+
+      if (parts[0] === "interest" && parts[1] === "signup") {
+        const interestId = Number(parts[2]);
+        const role = parts[3];
+        const interest = getInterestById(store, interestId);
+
+        if (!interest) {
+          return interaction.reply({
+            content: "Ce tableau n'existe pas.",
+            ephemeral: true,
+          });
+        }
+
+        const character = interaction.fields.getTextInputValue("character").trim();
+        const classe = interaction.fields.getTextInputValue("class").trim();
+        const rating = Number(
+          interaction.fields.getTextInputValue("rating").trim()
+        );
+
+        if (!Number.isInteger(rating) || rating < 0 || rating > 4000) {
+          return interaction.reply({
+            content: "Rating invalide. Entre un entier entre 0 et 4000.",
+            ephemeral: true,
+          });
+        }
+
+        const existingIndex = interest.entries.findIndex(
+          (entry) =>
+            entry.userId === interaction.user.id &&
+            entry.role === role
+        );
+
+        const entry = {
+          userId: interaction.user.id,
+          username: interaction.user.username,
+          character,
+          class: classe,
+          rating,
+          role,
+          joinedAt: Date.now(),
+        };
+
+        if (existingIndex >= 0) {
+          interest.entries[existingIndex] = entry;
+        } else {
+          interest.entries.push(entry);
+        }
+
+        saveStore(guildId, store);
+        await refreshInterestMessage(client, interest);
+
+        return interaction.reply({
+          content: `Inscription enregistrée sur le rôle ${role.toUpperCase()} dans le tableau #${interest.id}.`,
+          ephemeral: true,
+        });
+      }
 
       if (!event) {
         return interaction.reply({

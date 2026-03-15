@@ -100,6 +100,24 @@ const commands = [
   new SlashCommandBuilder()
     .setName("pvp-export")
     .setDescription("Exporter le JSON du serveur actuel"),
+
+  new SlashCommandBuilder()
+    .setName("rbg-interest-create")
+    .setDescription("Créer un tableau d'intérêt RBG")
+    .addStringOption((o) =>
+      o.setName("title").setDescription("Titre du tableau").setRequired(true)
+    ),
+
+  new SlashCommandBuilder()
+    .setName("rbg-interest-delete")
+    .setDescription("Supprimer un tableau d'intérêt RBG par ID")
+    .addIntegerOption((o) =>
+      o.setName("id").setDescription("ID du tableau").setRequired(true)
+    ),
+
+  new SlashCommandBuilder()
+    .setName("rbg-interest-list")
+    .setDescription("Lister les tableaux d'intérêt RBG actifs"),
 ].map((command) => command.toJSON());
 
 const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);

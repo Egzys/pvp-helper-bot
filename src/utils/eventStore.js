@@ -25,7 +25,16 @@ function ensureGuildStore(guildId) {
   if (!fs.existsSync(filePath)) {
     fs.writeFileSync(
       filePath,
-      JSON.stringify({ nextEventId: 1, events: [] }, null, 2),
+      JSON.stringify(
+        {
+          nextEventId: 1,
+          nextInterestId: 1,
+          events: [],
+          interests: [],
+        },
+        null,
+        2
+      ),
       "utf8"
     );
   }
@@ -40,18 +49,24 @@ function loadStore(guildId) {
     const raw = fs.readFileSync(filePath, "utf8");
     const parsed = JSON.parse(raw);
 
-    if (
-      typeof parsed !== "object" ||
-      typeof parsed.nextEventId !== "number" ||
-      !Array.isArray(parsed.events)
-    ) {
+    if (typeof parsed !== "object") {
       throw new Error("Format JSON invalide.");
     }
+
+    if (typeof parsed.nextEventId !== "number") parsed.nextEventId = 1;
+    if (typeof parsed.nextInterestId !== "number") parsed.nextInterestId = 1;
+    if (!Array.isArray(parsed.events)) parsed.events = [];
+    if (!Array.isArray(parsed.interests)) parsed.interests = [];
 
     return parsed;
   } catch (error) {
     console.error(`Erreur lecture store guild ${guildId}:`, error);
-    return { nextEventId: 1, events: [] };
+    return {
+      nextEventId: 1,
+      nextInterestId: 1,
+      events: [],
+      interests: [],
+    };
   }
 }
 
@@ -72,6 +87,18 @@ function removeEventById(store, eventId) {
   return removed;
 }
 
+function getInterestById(store, interestId) {
+  return store.interests.find((item) => item.id === interestId);
+}
+
+function removeInterestById(store, interestId) {
+  const index = store.interests.findIndex((item) => item.id === interestId);
+  if (index === -1) return null;
+
+  const [removed] = store.interests.splice(index, 1);
+  return removed;
+}
+
 function listGuildFiles() {
   ensureDirs();
 
@@ -89,6 +116,8 @@ module.exports = {
   saveStore,
   getEventById,
   removeEventById,
+  getInterestById,
+  removeInterestById,
   listGuildFiles,
   getGuildFilePath,
 };
