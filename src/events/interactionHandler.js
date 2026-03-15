@@ -670,12 +670,10 @@ module.exports = (client) => {
     if (interaction.isModalSubmit()) {
       const parts = interaction.customId.split("_");
 
-      if (parts[0] !== "signup") return;
-
-      const eventId = Number(parts[1]);
-      const role = parts[2];
-      const event = getEventById(store, eventId);
-
+      // =========================
+      // MODAL RBG INTEREST
+      // customId: interest_signup_<interestId>_<role>
+      // =========================
       if (parts[0] === "interest" && parts[1] === "signup") {
         const interestId = Number(parts[2]);
         const role = parts[3];
@@ -684,6 +682,13 @@ module.exports = (client) => {
         if (!interest) {
           return interaction.reply({
             content: "Ce tableau n'existe pas.",
+            ephemeral: true,
+          });
+        }
+
+        if (!["tank", "heal", "dps"].includes(role)) {
+          return interaction.reply({
+            content: "Rôle invalide.",
             ephemeral: true,
           });
         }
@@ -732,6 +737,18 @@ module.exports = (client) => {
         });
       }
 
+      // =========================
+      // MODAL EVENT NORMAL
+      // customId: signup_<eventId>_<role>
+      // =========================
+      if (parts[0] !== "signup") {
+        return;
+      }
+
+      const eventId = Number(parts[1]);
+      const role = parts[2];
+      const event = getEventById(store, eventId);
+
       if (!event) {
         return interaction.reply({
           content: "Cet event n'existe pas.",
@@ -749,6 +766,13 @@ module.exports = (client) => {
       if (isLocked(event)) {
         return interaction.reply({
           content: "Les inscriptions sont verrouillées pour cet event.",
+          ephemeral: true,
+        });
+      }
+
+      if (!["tank", "heal", "dps"].includes(role)) {
+        return interaction.reply({
+          content: "Rôle invalide.",
           ephemeral: true,
         });
       }
