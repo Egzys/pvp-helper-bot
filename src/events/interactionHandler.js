@@ -5,6 +5,8 @@ const {
   TextInputStyle,
   PermissionsBitField,
   AttachmentBuilder,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
 } = require("discord.js");
 
 const {
@@ -30,12 +32,66 @@ const {
   buildInterestButtons,
   sanitizeMode,
   isRoleFull,
+  CLASS_SPECS,
+  prettyClassName,
 } = require("../utils/eventHelpers");
 
 function isAdmin(interaction) {
-  return interaction.member.permissions.has(
-    PermissionsBitField.Flags.Administrator
+  return interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
+}
+
+function getRegistrationPseudo(interaction) {
+  return (
+    interaction.member?.displayName ||
+    interaction.user?.globalName ||
+    interaction.user?.username ||
+    "Utilisateur Discord"
   );
+}
+
+function buildClassSelect(customId) {
+  const select = new StringSelectMenuBuilder()
+    .setCustomId(customId)
+    .setPlaceholder("Choisis ta classe")
+    .addOptions(
+      Object.entries(CLASS_SPECS).map(([classKey, data]) =>
+        new StringSelectMenuOptionBuilder()
+          .setLabel(data.label)
+          .setValue(classKey)
+          .setEmoji(data.emoji)
+      )
+    );
+
+  return new ActionRowBuilder().addComponents(select);
+}
+
+function buildSpecSelect(customId, classKey, requestedRole = null) {
+  const classData = CLASS_SPECS[classKey];
+
+  let specs = classData.specs;
+
+  if (requestedRole && ["tank", "heal", "dps"].includes(requestedRole)) {
+    specs = specs.filter((spec) => spec.role === requestedRole);
+  }
+
+  if (!specs.length) {
+    specs = classData.specs;
+  }
+
+  const select = new StringSelectMenuBuilder()
+    .setCustomId(customId)
+    .setPlaceholder("Choisis ta spécialisation")
+    .addOptions(
+      specs.map((spec) =>
+        new StringSelectMenuOptionBuilder()
+          .setLabel(`${spec.label} — ${spec.role.toUpperCase()}`)
+          .setValue(spec.key)
+          .setDescription(`${classData.label} ${spec.label}`)
+          .setEmoji(classData.emoji)
+      )
+    );
+
+  return new ActionRowBuilder().addComponents(select);
 }
 
 async function safeDeleteDiscordMessage(client, event) {
@@ -46,9 +102,9 @@ async function safeDeleteDiscordMessage(client, event) {
     const message = await channel.messages.fetch(event.messageId);
     if (!message) return;
 
-    await message.delete().catch(() => { });
+    await message.delete().catch(() => {});
   } catch (error) {
-    console.error(`Impossible de supprimer le message de l'event #${event.id}`, error);
+    console.error(`Impossible de supprimer le message #${event.id}`, error);
   }
 }
 
@@ -66,6 +122,23 @@ async function refreshEventMessage(client, event) {
     });
   } catch (error) {
     console.error(`Impossible de mettre à jour l'event #${event.id}`, error);
+  }
+}
+
+async function refreshInterestMessage(client, interest) {
+  try {
+    const channel = await client.channels.fetch(interest.channelId);
+    if (!channel) return;
+
+    const message = await channel.messages.fetch(interest.messageId);
+    if (!message) return;
+
+    await message.edit({
+      embeds: [buildInterestEmbed(interest)],
+      components: [buildInterestButtons(interest.id)],
+    });
+  } catch (error) {
+    console.error(`Impossible de mettre à jour l'interest #${interest.id}`, error);
   }
 }
 
@@ -109,23 +182,6 @@ function startBackgroundMaintenance(client) {
   setInterval(() => {
     cleanupAllGuilds(client).catch(console.error);
   }, 60_000);
-}
-
-async function refreshInterestMessage(client, interest) {
-  try {
-    const channel = await client.channels.fetch(interest.channelId);
-    if (!channel) return;
-
-    const message = await channel.messages.fetch(interest.messageId);
-    if (!message) return;
-
-    await message.edit({
-      embeds: [buildInterestEmbed(interest)],
-      components: [buildInterestButtons(interest.id)],
-    });
-  } catch (error) {
-    console.error(`Impossible de mettre à jour l'interest #${interest.id}`, error);
-  }
 }
 
 module.exports = (client) => {
@@ -192,7 +248,6 @@ module.exports = (client) => {
         event.messageId = reply.id;
         store.events.push(event);
         saveStore(guildId, store);
-
         return;
       }
 
@@ -226,13 +281,8 @@ module.exports = (client) => {
           });
         }
 
-        if (newName) {
-          event.name = newName;
-        }
-
-        if (newMode) {
-          event.mode = newMode;
-        }
+        if (newName) event.name = newName;
+        if (newMode) event.mode = newMode;
 
         let startAt = event.startAt;
         let durationMinutes = event.durationMinutes;
@@ -250,9 +300,7 @@ module.exports = (client) => {
           startAt = parsed.date.getTime();
         }
 
-        if (newDuration) {
-          durationMinutes = newDuration;
-        }
+        if (newDuration) durationMinutes = newDuration;
 
         const endAt = startAt + durationMinutes * 60 * 1000;
 
@@ -305,10 +353,7 @@ module.exports = (client) => {
       }
 
       if (interaction.commandName === "pvp-list") {
-        const requestedMode = sanitizeMode(
-          interaction.options.getString("mode") || "ALL"
-        );
-
+        const requestedMode = sanitizeMode(interaction.options.getString("mode") || "ALL");
         let events = store.events.filter((event) => !isExpired(event));
 
         if (requestedMode && requestedMode !== "ALL") {
@@ -418,7 +463,6 @@ module.exports = (client) => {
         interest.messageId = reply.id;
         store.interests.push(interest);
         saveStore(guildId, store);
-
         return;
       }
 
@@ -432,7 +476,10 @@ module.exports = (client) => {
 
         const lines = store.interests
           .sort((a, b) => a.id - b.id)
-          .map((item) => `**#${item.id}** — ${item.title} — ${item.entries.length} inscription(s)`);
+          .map(
+            (item) =>
+              `**#${item.id}** — ${item.title} — ${item.entries.length} inscription(s)`
+          );
 
         return interaction.reply({
           content: lines.join("\n"),
@@ -474,7 +521,7 @@ module.exports = (client) => {
 
       if (parts[0] === "join") {
         const eventId = Number(parts[1]);
-        const role = parts[2];
+        const requestedRole = parts[2];
         const event = getEventById(store, eventId);
 
         if (!event) {
@@ -498,45 +545,18 @@ module.exports = (client) => {
           });
         }
 
-        if (isRoleFull(event, role, interaction.user.id)) {
+        if (isRoleFull(event, requestedRole, interaction.user.id)) {
           return interaction.reply({
-            content: `Le slot ${role.toUpperCase()} est déjà complet.`,
+            content: `Le slot ${requestedRole.toUpperCase()} est déjà complet.`,
             ephemeral: true,
           });
         }
 
-        const modal = new ModalBuilder()
-          .setCustomId(`signup_${eventId}_${role}`)
-          .setTitle(`Inscription : ${event.name}`);
-
-        const characterInput = new TextInputBuilder()
-          .setCustomId("character")
-          .setLabel("Nom du perso")
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-          .setMaxLength(32);
-
-        const classInput = new TextInputBuilder()
-          .setCustomId("class")
-          .setLabel("Classe")
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-          .setMaxLength(32);
-
-        const ratingInput = new TextInputBuilder()
-          .setCustomId("rating")
-          .setLabel("Rating (0-4000)")
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-          .setMaxLength(4);
-
-        modal.addComponents(
-          new ActionRowBuilder().addComponents(characterInput),
-          new ActionRowBuilder().addComponents(classInput),
-          new ActionRowBuilder().addComponents(ratingInput)
-        );
-
-        return interaction.showModal(modal);
+        return interaction.reply({
+          content: `Choisis ta classe pour t'inscrire en **${requestedRole.toUpperCase()}** :`,
+          components: [buildClassSelect(`class_event_${eventId}_${requestedRole}`)],
+          ephemeral: true,
+        });
       }
 
       if (parts[0] === "leave") {
@@ -565,7 +585,6 @@ module.exports = (client) => {
         }
 
         const beforeCount = event.participants.length;
-
         event.participants = event.participants.filter(
           (participant) => participant.userId !== interaction.user.id
         );
@@ -589,7 +608,7 @@ module.exports = (client) => {
 
       if (parts[0] === "interest" && parts[1] === "join") {
         const interestId = Number(parts[2]);
-        const role = parts[3];
+        const requestedRole = parts[3];
         const interest = getInterestById(store, interestId);
 
         if (!interest) {
@@ -599,38 +618,11 @@ module.exports = (client) => {
           });
         }
 
-        const modal = new ModalBuilder()
-          .setCustomId(`interest_signup_${interestId}_${role}`)
-          .setTitle(`Inscription : ${interest.title}`);
-
-        const characterInput = new TextInputBuilder()
-          .setCustomId("character")
-          .setLabel("Nom du perso")
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-          .setMaxLength(32);
-
-        const classInput = new TextInputBuilder()
-          .setCustomId("class")
-          .setLabel("Classe")
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-          .setMaxLength(32);
-
-        const ratingInput = new TextInputBuilder()
-          .setCustomId("rating")
-          .setLabel("Rating (0-4000)")
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-          .setMaxLength(4);
-
-        modal.addComponents(
-          new ActionRowBuilder().addComponents(characterInput),
-          new ActionRowBuilder().addComponents(classInput),
-          new ActionRowBuilder().addComponents(ratingInput)
-        );
-
-        return interaction.showModal(modal);
+        return interaction.reply({
+          content: `Choisis ta classe pour t'inscrire en **${requestedRole.toUpperCase()}** :`,
+          components: [buildClassSelect(`class_interest_${interestId}_${requestedRole}`)],
+          ephemeral: true,
+        });
       }
 
       if (parts[0] === "interest" && parts[1] === "leave") {
@@ -645,7 +637,6 @@ module.exports = (client) => {
         }
 
         const before = interest.entries.length;
-
         interest.entries = interest.entries.filter(
           (entry) => entry.userId !== interaction.user.id
         );
@@ -667,178 +658,203 @@ module.exports = (client) => {
       }
     }
 
+    if (interaction.isStringSelectMenu()) {
+      const parts = interaction.customId.split("_");
+
+      if (parts[0] === "class") {
+        const type = parts[1];
+        const id = Number(parts[2]);
+        const requestedRole = parts[3];
+        const classKey = interaction.values[0];
+
+        return interaction.update({
+          content: `Classe choisie : **${prettyClassName(classKey)}**\nChoisis maintenant ta spécialisation :`,
+          components: [
+            buildSpecSelect(`spec_${type}_${id}_${requestedRole}_${classKey}`, classKey, requestedRole),
+          ],
+        });
+      }
+
+      if (parts[0] === "spec") {
+        const type = parts[1];
+        const id = Number(parts[2]);
+        const requestedRole = parts[3];
+        const classKey = parts[4];
+        const specKey = interaction.values[0];
+
+        const classData = CLASS_SPECS[classKey];
+        const specData = classData?.specs.find((spec) => spec.key === specKey);
+
+        if (!classData || !specData) {
+          return interaction.reply({
+            content: "Classe ou spécialisation invalide.",
+            ephemeral: true,
+          });
+        }
+
+        const modal = new ModalBuilder()
+          .setCustomId(`rating_${type}_${id}_${requestedRole}_${classKey}_${specKey}`)
+          .setTitle(`${classData.label} ${specData.label}`);
+
+        const ratingInput = new TextInputBuilder()
+          .setCustomId("rating")
+          .setLabel("Rating (0-4000)")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMaxLength(4);
+
+        modal.addComponents(new ActionRowBuilder().addComponents(ratingInput));
+
+        return interaction.showModal(modal);
+      }
+    }
+
     if (interaction.isModalSubmit()) {
       const parts = interaction.customId.split("_");
 
-      // =========================
-      // MODAL RBG INTEREST
-      // customId: interest_signup_<interestId>_<role>
-      // =========================
-      if (parts[0] === "interest" && parts[1] === "signup") {
-        const interestId = Number(parts[2]);
-        const role = parts[3];
-        const interest = getInterestById(store, interestId);
+      if (parts[0] === "rating") {
+        const type = parts[1];
+        const id = Number(parts[2]);
+        const requestedRole = parts[3];
+        const classKey = parts[4];
+        const specKey = parts[5];
 
-        if (!interest) {
+        const classData = CLASS_SPECS[classKey];
+        const specData = classData?.specs.find((spec) => spec.key === specKey);
+
+        if (!classData || !specData) {
           return interaction.reply({
-            content: "Ce tableau n'existe pas.",
+            content: "Classe ou spécialisation invalide.",
             ephemeral: true,
           });
         }
 
-        if (!["tank", "heal", "dps"].includes(role)) {
+        const role = specData.role;
+
+        if (requestedRole && requestedRole !== role) {
           return interaction.reply({
-            content: "Rôle invalide.",
+            content: `Cette spécialisation est ${role.toUpperCase()}, pas ${requestedRole.toUpperCase()}.`,
             ephemeral: true,
           });
         }
 
-        const character = interaction.fields.getTextInputValue("character").trim();
-        const classe = interaction.fields.getTextInputValue("class").trim();
-        const rating = Number(
-          interaction.fields.getTextInputValue("rating").trim()
-        );
+        const rating = Number(interaction.fields.getTextInputValue("rating").trim());
 
         if (!Number.isInteger(rating) || rating < 0 || rating > 4000) {
           return interaction.reply({
-            content: "Rating invalide. Entre un entier entre 0 et 4000.",
+            content: "Rating invalide.\nEntre un entier entre 0 et 4000.",
             ephemeral: true,
           });
         }
 
-        const existingIndex = interest.entries.findIndex(
-          (entry) =>
-            entry.userId === interaction.user.id &&
-            entry.role === role
-        );
+        if (type === "interest") {
+          const interest = getInterestById(store, id);
 
-        const entry = {
-          userId: interaction.user.id,
-          username: interaction.user.username,
-          character,
-          class: classe,
-          rating,
-          role,
-          joinedAt: Date.now(),
-        };
+          if (!interest) {
+            return interaction.reply({
+              content: "Ce tableau n'existe pas.",
+              ephemeral: true,
+            });
+          }
 
-        if (existingIndex >= 0) {
-          interest.entries[existingIndex] = entry;
-        } else {
-          interest.entries.push(entry);
+          const pseudo = getRegistrationPseudo(interaction).trim();
+
+          const existingIndex = interest.entries.findIndex(
+            (entry) => entry.userId === interaction.user.id && entry.role === role
+          );
+
+          const entry = {
+            userId: interaction.user.id,
+            username: interaction.user.username,
+            character: pseudo,
+            class: classKey,
+            spec: specKey,
+            specLabel: specData.label,
+            rating,
+            role,
+            joinedAt: Date.now(),
+          };
+
+          if (existingIndex >= 0) {
+            interest.entries[existingIndex] = entry;
+          } else {
+            interest.entries.push(entry);
+          }
+
+          saveStore(guildId, store);
+          await refreshInterestMessage(client, interest);
+
+          return interaction.reply({
+            content: `Inscription enregistrée : ${classData.emoji} **${classData.label} ${specData.label}** — ${role.toUpperCase()} — ${rating}.`,
+            ephemeral: true,
+          });
         }
 
-        saveStore(guildId, store);
-        await refreshInterestMessage(client, interest);
+        if (type === "event") {
+          const event = getEventById(store, id);
 
-        return interaction.reply({
-          content: `Inscription enregistrée sur le rôle ${role.toUpperCase()} dans le tableau #${interest.id}.`,
-          ephemeral: true,
-        });
+          if (!event) {
+            return interaction.reply({
+              content: "Cet event n'existe pas.",
+              ephemeral: true,
+            });
+          }
+
+          if (isExpired(event)) {
+            return interaction.reply({
+              content: "Cet event est expiré.",
+              ephemeral: true,
+            });
+          }
+
+          if (isLocked(event)) {
+            return interaction.reply({
+              content: "Les inscriptions sont verrouillées pour cet event.",
+              ephemeral: true,
+            });
+          }
+
+          if (isRoleFull(event, role, interaction.user.id)) {
+            return interaction.reply({
+              content: `Le slot ${role.toUpperCase()} est déjà complet.`,
+              ephemeral: true,
+            });
+          }
+
+          const pseudo = getRegistrationPseudo(interaction).trim();
+
+          const existingIndex = event.participants.findIndex(
+            (participant) => participant.userId === interaction.user.id
+          );
+
+          const participant = {
+            userId: interaction.user.id,
+            username: interaction.user.username,
+            character: pseudo,
+            class: classKey,
+            spec: specKey,
+            specLabel: specData.label,
+            rating,
+            role,
+            joinedAt: Date.now(),
+          };
+
+          if (existingIndex >= 0) {
+            event.participants[existingIndex] = participant;
+          } else {
+            event.participants.push(participant);
+          }
+
+          sortParticipants(event.participants);
+          saveStore(guildId, store);
+          await refreshEventMessage(client, event);
+
+          return interaction.reply({
+            content: `Inscription enregistrée : ${classData.emoji} **${classData.label} ${specData.label}** — ${role.toUpperCase()} — ${rating}.`,
+            ephemeral: true,
+          });
+        }
       }
-
-      // =========================
-      // MODAL EVENT NORMAL
-      // customId: signup_<eventId>_<role>
-      // =========================
-      if (parts[0] !== "signup") {
-        return;
-      }
-
-      const eventId = Number(parts[1]);
-      const role = parts[2];
-      const event = getEventById(store, eventId);
-
-      if (!event) {
-        return interaction.reply({
-          content: "Cet event n'existe pas.",
-          ephemeral: true,
-        });
-      }
-
-      if (isExpired(event)) {
-        return interaction.reply({
-          content: "Cet event est expiré.",
-          ephemeral: true,
-        });
-      }
-
-      if (isLocked(event)) {
-        return interaction.reply({
-          content: "Les inscriptions sont verrouillées pour cet event.",
-          ephemeral: true,
-        });
-      }
-
-      if (!["tank", "heal", "dps"].includes(role)) {
-        return interaction.reply({
-          content: "Rôle invalide.",
-          ephemeral: true,
-        });
-      }
-
-      if (isRoleFull(event, role, interaction.user.id)) {
-        return interaction.reply({
-          content: `Le slot ${role.toUpperCase()} est déjà complet.`,
-          ephemeral: true,
-        });
-      }
-
-      const character = interaction.fields.getTextInputValue("character").trim();
-      const classe = interaction.fields.getTextInputValue("class").trim();
-      const rating = Number(
-        interaction.fields.getTextInputValue("rating").trim()
-      );
-
-      if (!Number.isInteger(rating) || rating < 0 || rating > 4000) {
-        return interaction.reply({
-          content: "Rating invalide. Entre un entier entre 0 et 4000.",
-          ephemeral: true,
-        });
-      }
-
-      const existingIndex = event.participants.findIndex(
-        (p) => p.userId === interaction.user.id
-      );
-
-      const previousParticipant =
-        existingIndex >= 0 ? event.participants[existingIndex] : null;
-
-      if (
-        previousParticipant &&
-        previousParticipant.role !== role &&
-        isRoleFull(event, role, interaction.user.id)
-      ) {
-        return interaction.reply({
-          content: `Impossible de passer en ${role.toUpperCase()} : slot complet.`,
-          ephemeral: true,
-        });
-      }
-
-      const participant = {
-        userId: interaction.user.id,
-        username: interaction.user.username,
-        character,
-        class: classe,
-        rating,
-        role,
-        joinedAt: Date.now(),
-      };
-
-      if (existingIndex >= 0) {
-        event.participants[existingIndex] = participant;
-      } else {
-        event.participants.push(participant);
-      }
-
-      sortParticipants(event.participants);
-      saveStore(guildId, store);
-      await refreshEventMessage(client, event);
-
-      return interaction.reply({
-        content: `Inscription enregistrée pour l'event #${event.id}.`,
-        ephemeral: true,
-      });
     }
   });
 };
