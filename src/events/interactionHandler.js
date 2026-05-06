@@ -103,7 +103,7 @@ async function safeDeleteDiscordMessage(client, event) {
     const message = await channel.messages.fetch(event.messageId);
     if (!message) return;
 
-    await message.delete().catch(() => {});
+    await message.delete().catch(() => { });
   } catch (error) {
     console.error(`Impossible de supprimer le message #${event.id}`, error);
   }
@@ -556,6 +556,63 @@ module.exports = (client) => {
         return interaction.reply({
           content: `Choisis ta classe pour t'inscrire en **${requestedRole.toUpperCase()}** :`,
           components: [buildClassSelect(`class_event_${eventId}_${requestedRole}`, requestedRole)],
+          ephemeral: true,
+        });
+      }
+      if (parts[0] === "absent") {
+        const eventId = Number(parts[1]);
+        const event = getEventById(store, eventId);
+
+        if (!event) {
+          return interaction.reply({
+            content: "Cet event n'existe pas.",
+            ephemeral: true,
+          });
+        }
+
+        if (isExpired(event)) {
+          return interaction.reply({
+            content: "Cet event est expiré.",
+            ephemeral: true,
+          });
+        }
+
+        if (isLocked(event)) {
+          return interaction.reply({
+            content: "Les inscriptions sont verrouillées pour cet event.",
+            ephemeral: true,
+          });
+        }
+
+        const pseudo = getRegistrationPseudo(interaction).trim();
+
+        const existingIndex = event.participants.findIndex(
+          (participant) => participant.userId === interaction.user.id
+        );
+
+        const participant = {
+          userId: interaction.user.id,
+          username: interaction.user.username,
+          character: pseudo,
+          class: null,
+          spec: null,
+          specLabel: null,
+          rating: 0,
+          role: "absent",
+          joinedAt: Date.now(),
+        };
+
+        if (existingIndex >= 0) {
+          event.participants[existingIndex] = participant;
+        } else {
+          event.participants.push(participant);
+        }
+
+        saveStore(guildId, store);
+        await refreshEventMessage(client, event);
+
+        return interaction.reply({
+          content: `Tu es marqué absent pour l'event #${event.id}.`,
           ephemeral: true,
         });
       }

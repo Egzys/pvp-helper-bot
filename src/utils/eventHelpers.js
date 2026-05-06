@@ -400,6 +400,16 @@ function buildEventEmbed(event) {
         name: "LISTE DPS",
         value: buildRoleList(event.participants, "dps"),
         inline: false,
+      },
+      {
+        name: "ABSENTS",
+        value: `**${countAbsent(event.participants)}**`,
+        inline: false,
+      },
+      {
+        name: "LISTE ABSENTS",
+        value: buildAbsentList(event.participants),
+        inline: false,
       }
     )
     .setFooter({ text: `ID event: ${event.id}` });
@@ -427,11 +437,32 @@ function buildEventButtons(event, locked = false) {
       .setStyle(ButtonStyle.Danger)
       .setDisabled(locked || dpsFull),
     new ButtonBuilder()
+      .setCustomId(`absent_${event.id}`)
+      .setLabel("Absent")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(locked),
+    new ButtonBuilder()
       .setCustomId(`leave_${event.id}`)
-      .setLabel("Quitter l'event")
+      .setLabel("Quitter")
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(locked)
   );
+}
+
+function buildAbsentList(participants) {
+  const absent = participants.filter((p) => p.role === "absent");
+
+  if (!absent.length) {
+    return "Aucun";
+  }
+
+  return absent
+    .map((p, index) => `**${index + 1}.** ${p.character}`)
+    .join("\n");
+}
+
+function countAbsent(participants) {
+  return participants.filter((p) => p.role === "absent").length;
 }
 
 function sanitizeMode(mode) {
@@ -560,4 +591,6 @@ module.exports = {
   buildInterestRoleList,
   buildInterestEmbed,
   buildInterestButtons,
+  buildAbsentList,
+  countAbsent,
 };
