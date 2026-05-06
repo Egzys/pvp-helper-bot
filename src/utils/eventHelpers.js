@@ -259,15 +259,6 @@ function getClassIcon(input) {
   return CLASS_SPECS[key]?.emoji || "";
 }
 
-function getClassDisplay(input) {
-  const key = canonicalClassKey(input) || input;
-  const classData = CLASS_SPECS[key];
-
-  if (!classData) return prettyClassName(input);
-
-  return `${classData.emoji} ${classData.label}`;
-}
-
 function getSpecLabel(classKey, specKey, fallback = null) {
   const classData = CLASS_SPECS[classKey];
   const specData = classData?.specs.find((spec) => spec.key === specKey);
@@ -280,12 +271,12 @@ function getParticipantClassLine(participant) {
   const classData = CLASS_SPECS[classKey];
 
   if (!classData) {
-    return `${getClassDisplay(participant.class)} ${participant.specLabel || ""}`.trim();
+    return `${getClassIcon(participant.class)} ${participant.specLabel || ""}`.trim();
   }
 
   const specLabel = getSpecLabel(classKey, participant.spec, participant.specLabel);
 
-  return `${classData.emoji} ${classData.label}${specLabel ? ` ${specLabel}` : ""}`;
+  return `${classData.emoji} ${specLabel}`.trim();
 }
 
 function getModeLimits(mode) {
@@ -555,7 +546,6 @@ module.exports = {
   canonicalClassKey,
   prettyClassName,
   getClassIcon,
-  getClassDisplay,
   getSpecLabel,
   getParticipantClassLine,
   getModeLimits,

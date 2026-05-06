@@ -49,12 +49,17 @@ function getRegistrationPseudo(interaction) {
   );
 }
 
-function buildClassSelect(customId) {
+function buildClassSelect(customId, requestedRole = null) {
+  const classes = Object.entries(CLASS_SPECS).filter(([, data]) => {
+    if (!requestedRole) return true;
+    return data.specs.some((spec) => spec.role === requestedRole);
+  });
+
   const select = new StringSelectMenuBuilder()
     .setCustomId(customId)
     .setPlaceholder("Choisis ta classe")
     .addOptions(
-      Object.entries(CLASS_SPECS).map(([classKey, data]) =>
+      classes.map(([classKey, data]) =>
         new StringSelectMenuOptionBuilder()
           .setLabel(data.label)
           .setValue(classKey)
@@ -72,10 +77,6 @@ function buildSpecSelect(customId, classKey, requestedRole = null) {
 
   if (requestedRole && ["tank", "heal", "dps"].includes(requestedRole)) {
     specs = specs.filter((spec) => spec.role === requestedRole);
-  }
-
-  if (!specs.length) {
-    specs = classData.specs;
   }
 
   const select = new StringSelectMenuBuilder()
@@ -554,7 +555,7 @@ module.exports = (client) => {
 
         return interaction.reply({
           content: `Choisis ta classe pour t'inscrire en **${requestedRole.toUpperCase()}** :`,
-          components: [buildClassSelect(`class_event_${eventId}_${requestedRole}`)],
+          components: [buildClassSelect(`class_event_${eventId}_${requestedRole}`, requestedRole)],
           ephemeral: true,
         });
       }
@@ -620,7 +621,9 @@ module.exports = (client) => {
 
         return interaction.reply({
           content: `Choisis ta classe pour t'inscrire en **${requestedRole.toUpperCase()}** :`,
-          components: [buildClassSelect(`class_interest_${interestId}_${requestedRole}`)],
+          components: [
+            buildClassSelect(`class_interest_${interestId}_${requestedRole}`, requestedRole),
+          ],
           ephemeral: true,
         });
       }
@@ -670,7 +673,11 @@ module.exports = (client) => {
         return interaction.update({
           content: `Classe choisie : **${prettyClassName(classKey)}**\nChoisis maintenant ta spécialisation :`,
           components: [
-            buildSpecSelect(`spec_${type}_${id}_${requestedRole}_${classKey}`, classKey, requestedRole),
+            buildSpecSelect(
+              `spec_${type}_${id}_${requestedRole}_${classKey}`,
+              classKey,
+              requestedRole
+            ),
           ],
         });
       }
@@ -785,7 +792,7 @@ module.exports = (client) => {
           await refreshInterestMessage(client, interest);
 
           return interaction.reply({
-            content: `Inscription enregistrée : ${classData.emoji} **${classData.label} ${specData.label}** — ${role.toUpperCase()} — ${rating}.`,
+            content: `Inscription enregistrée : ${classData.emoji} **${specData.label}** — ${role.toUpperCase()} — ${rating}.`,
             ephemeral: true,
           });
         }
@@ -850,7 +857,7 @@ module.exports = (client) => {
           await refreshEventMessage(client, event);
 
           return interaction.reply({
-            content: `Inscription enregistrée : ${classData.emoji} **${classData.label} ${specData.label}** — ${role.toUpperCase()} — ${rating}.`,
+            content: `Inscription enregistrée : ${classData.emoji} **${specData.label}** — ${role.toUpperCase()} — ${rating}.`,
             ephemeral: true,
           });
         }
