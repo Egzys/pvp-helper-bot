@@ -14,31 +14,140 @@ const MODE_LIMITS = {
 
 const ALLOWED_MODES = Object.keys(MODE_LIMITS);
 
-/*
-  Remplace les IDs ci-dessous par TES vrais emojis custom Discord.
-*/
-const CLASS_EMOJIS = {
-  warrior: "<:warrior_anima:1481698186514010283>",
-  paladin: "<:paladin_anima:1481698233171443763>",
-  hunter: "<:hunt_anima:1481698268789346380>",
-  rogue: "<:rogue_anima:1481698286321532948>",
-  priest: "<:priest_anima:1481698303304274073>",
-  deathknight: "<:dk_anima:1481698324791824454>",
-  shaman: "<:sham_anima:1481698351878635540>",
-  mage: "<:mage_anima:1481698370970980606>",
-  warlock: "<:warlock_anima:1481698395495075890>",
-  monk: "<:monk_anima:1481698413367005407>",
-  druid: "<:drood_anima:1481698435693281360>",
-  demonhunter: "<:dh_anima:1481698453523529920>",
-  evoker: "<:evok_anima:1481698475912462456>",
+const CLASS_SPECS = {
+  warrior: {
+    label: "Warrior",
+    emoji: "<:warrior_anima:1481698186514010283>",
+    specs: [
+      { key: "arms", label: "Arms", role: "dps" },
+      { key: "fury", label: "Fury", role: "dps" },
+      { key: "protection", label: "Protection", role: "tank" },
+    ],
+  },
+  paladin: {
+    label: "Paladin",
+    emoji: "<:paladin_anima:1481698233171443763>",
+    specs: [
+      { key: "holy", label: "Holy", role: "heal" },
+      { key: "retribution", label: "Retribution", role: "dps" },
+      { key: "protection", label: "Protection", role: "tank" },
+    ],
+  },
+  hunter: {
+    label: "Hunter",
+    emoji: "<:hunt_anima:1481698268789346380>",
+    specs: [
+      { key: "marksmanship", label: "Marksmanship", role: "dps" },
+      { key: "bm", label: "BM", role: "dps" },
+      { key: "survival", label: "Survival", role: "dps" },
+    ],
+  },
+  rogue: {
+    label: "Rogue",
+    emoji: "<:rogue_anima:1481698286321532948>",
+    specs: [
+      { key: "outlaw", label: "Outlaw", role: "dps" },
+      { key: "sub", label: "Sub", role: "dps" },
+      { key: "assa", label: "Assa", role: "dps" },
+    ],
+  },
+  priest: {
+    label: "Priest",
+    emoji: "<:priest_anima:1481698303304274073>",
+    specs: [
+      { key: "holy", label: "Holy", role: "heal" },
+      { key: "unholy", label: "Unholy", role: "heal" },
+      { key: "sp", label: "SP", role: "dps" },
+    ],
+  },
+  deathknight: {
+    label: "Deathknight",
+    emoji: "<:dk_anima:1481698324791824454>",
+    specs: [
+      { key: "unholy", label: "Unholy", role: "dps" },
+      { key: "blood", label: "Blood", role: "tank" },
+      { key: "frost", label: "Frost", role: "dps" },
+    ],
+  },
+  shaman: {
+    label: "Shaman",
+    emoji: "<:sham_anima:1481698351878635540>",
+    specs: [
+      { key: "resto", label: "Resto", role: "heal" },
+      { key: "enhancement", label: "Enhancement", role: "dps" },
+      { key: "elemental", label: "Elemental", role: "dps" },
+    ],
+  },
+  mage: {
+    label: "Mage",
+    emoji: "<:mage_anima:1481698370970980606>",
+    specs: [
+      { key: "fire", label: "Fire", role: "dps" },
+      { key: "frost", label: "Frost", role: "dps" },
+      { key: "arcane", label: "Arcane", role: "dps" },
+    ],
+  },
+  warlock: {
+    label: "Warlock",
+    emoji: "<:warlock_anima:1481698395495075890>",
+    specs: [
+      { key: "destro", label: "Destro", role: "dps" },
+      { key: "affli", label: "Affli", role: "dps" },
+      { key: "demono", label: "Demono", role: "dps" },
+    ],
+  },
+  monk: {
+    label: "Monk",
+    emoji: "<:monk_anima:1481698413367005407>",
+    specs: [
+      { key: "ww", label: "WW", role: "dps" },
+      { key: "bw", label: "BW", role: "tank" },
+      { key: "mw", label: "MW", role: "heal" },
+    ],
+  },
+  druid: {
+    label: "Druid",
+    emoji: "<:drood_anima:1481698435693281360>",
+    specs: [
+      { key: "gardian", label: "Gardian", role: "tank" },
+      { key: "boomy", label: "Boomy", role: "dps" },
+      { key: "feral", label: "Feral", role: "dps" },
+      { key: "resto", label: "Resto", role: "heal" },
+    ],
+  },
+  demonhunter: {
+    label: "Demonhunter",
+    emoji: "<:dh_anima:1481698453523529920>",
+    specs: [
+      { key: "havoc", label: "Havoc", role: "dps" },
+      { key: "devorer", label: "Devorer", role: "dps" },
+      { key: "vengeance", label: "Vengeance", role: "tank" },
+    ],
+  },
+  evoker: {
+    label: "Evoker",
+    emoji: "<:evok_anima:1481698475912462456>",
+    specs: [
+      { key: "devastation", label: "Devastation", role: "dps" },
+      { key: "augment", label: "Augment", role: "dps" },
+      { key: "preservation", label: "Preservation", role: "heal" },
+    ],
+  },
 };
+
+const CLASS_EMOJIS = Object.fromEntries(
+  Object.entries(CLASS_SPECS).map(([key, value]) => [key, value.emoji])
+);
 
 function parseEventDate(input) {
   const regex = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/;
   const match = String(input || "").trim().match(regex);
 
   if (!match) {
-    return { ok: false, error: "Format invalide. Utilise YYYY-MM-DD HH:mm" };
+    return {
+      ok: false,
+      error: "Format invalide. Utilise YYYY-MM-DD HH:mm",
+    };
   }
 
   const [, yearStr, monthStr, dayStr, hourStr, minuteStr] = match;
@@ -75,7 +184,7 @@ function parseEventDate(input) {
 
 function formatDiscordTimestamp(ms) {
   const unix = Math.floor(ms / 1000);
-  return `<t:${unix}:F>\n<t:${unix}:R>`;
+  return `<t:${unix}:F>`;
 }
 
 function formatDiscordTimestampShort(ms) {
@@ -110,46 +219,30 @@ function canonicalClassKey(input) {
   const map = {
     guerrier: "warrior",
     warrior: "warrior",
-
     paladin: "paladin",
-
     chasseur: "hunter",
     hunter: "hunter",
-
     voleur: "rogue",
     rogue: "rogue",
-
     pretre: "priest",
-    prêtre: "priest",
     priest: "priest",
-
     chevalierdelamort: "deathknight",
     chevaliermort: "deathknight",
     dk: "deathknight",
     deathknight: "deathknight",
-
     chaman: "shaman",
     shaman: "shaman",
-
     mage: "mage",
-
     demoniste: "warlock",
-    démoniste: "warlock",
     warlock: "warlock",
-
     moine: "monk",
     monk: "monk",
-
     druide: "druid",
     druid: "druid",
-
     chasseurdedemons: "demonhunter",
-    chasseurdedémons: "demonhunter",
     dh: "demonhunter",
     demonhunter: "demonhunter",
-
     evocateur: "evoker",
-    évocateur: "evoker",
     evoker: "evoker",
   };
 
@@ -157,41 +250,42 @@ function canonicalClassKey(input) {
 }
 
 function prettyClassName(input) {
-  const key = canonicalClassKey(input);
-
-  const map = {
-    warrior: "Guerrier",
-    paladin: "Paladin",
-    hunter: "Chasseur",
-    rogue: "Voleur",
-    priest: "Prêtre",
-    deathknight: "Chevalier de la mort",
-    shaman: "Chaman",
-    mage: "Mage",
-    warlock: "Démoniste",
-    monk: "Moine",
-    druid: "Druide",
-    demonhunter: "Chasseur de démons",
-    evoker: "Évocateur",
-  };
-
-  return map[key] || input;
+  const key = canonicalClassKey(input) || input;
+  return CLASS_SPECS[key]?.label || input;
 }
 
 function getClassIcon(input) {
-  const key = canonicalClassKey(input);
-  if (!key) return "";
-  return CLASS_EMOJIS[key] || "";
+  const key = canonicalClassKey(input) || input;
+  return CLASS_SPECS[key]?.emoji || "";
 }
 
 function getClassDisplay(input) {
-  const icon = getClassIcon(input);
+  const key = canonicalClassKey(input) || input;
+  const classData = CLASS_SPECS[key];
 
-  if (icon) {
-    return icon;
+  if (!classData) return prettyClassName(input);
+
+  return `${classData.emoji} ${classData.label}`;
+}
+
+function getSpecLabel(classKey, specKey, fallback = null) {
+  const classData = CLASS_SPECS[classKey];
+  const specData = classData?.specs.find((spec) => spec.key === specKey);
+
+  return specData?.label || fallback || specKey || "";
+}
+
+function getParticipantClassLine(participant) {
+  const classKey = canonicalClassKey(participant.class) || participant.class;
+  const classData = CLASS_SPECS[classKey];
+
+  if (!classData) {
+    return `${getClassDisplay(participant.class)} ${participant.specLabel || ""}`.trim();
   }
 
-  return prettyClassName(input);
+  const specLabel = getSpecLabel(classKey, participant.spec, participant.specLabel);
+
+  return `${classData.emoji} ${classData.label}${specLabel ? ` ${specLabel}` : ""}`;
 }
 
 function getModeLimits(mode) {
@@ -225,7 +319,7 @@ function buildRoleList(participants, role) {
 
   return filtered
     .map((p, index) => {
-      return `**${index + 1}.** ${getClassDisplay(p.class)} — **${p.character}** — **${p.rating}**`;
+      return `**${index + 1}.** ${getParticipantClassLine(p)} — **${p.character}** — **${p.rating}**`;
     })
     .join("\n");
 }
@@ -233,6 +327,7 @@ function buildRoleList(participants, role) {
 function buildSummaryLine(event) {
   const status = isLocked(event) ? "VERROUILLÉ" : "OUVERT";
   const limits = getModeLimits(event.mode);
+
   const tankCount = countRole(event.participants, "tank");
   const healCount = countRole(event.participants, "heal");
   const dpsCount = countRole(event.participants, "dps");
@@ -244,9 +339,11 @@ function buildSummaryLine(event) {
 
 function buildEventEmbed(event) {
   const limits = getModeLimits(event.mode);
+
   const tankCount = countRole(event.participants, "tank");
   const healCount = countRole(event.participants, "heal");
   const dpsCount = countRole(event.participants, "dps");
+
   const locked = isLocked(event);
 
   return new EmbedBuilder()
@@ -273,7 +370,6 @@ function buildEventEmbed(event) {
         value: event.mode,
         inline: true,
       },
-
       {
         name: "TANKS",
         value: `**${tankCount}/${limits.tank}**`,
@@ -289,7 +385,6 @@ function buildEventEmbed(event) {
         value: locked ? "Verrouillé" : "Ouvert",
         inline: true,
       },
-
       {
         name: "LISTE TANK",
         value: buildRoleList(event.participants, "tank"),
@@ -305,7 +400,6 @@ function buildEventEmbed(event) {
         value: "\u200B",
         inline: true,
       },
-
       {
         name: "DPS",
         value: `**${dpsCount}/${limits.dps}**`,
@@ -352,8 +446,10 @@ function buildEventButtons(event, locked = false) {
 function sanitizeMode(mode) {
   if (!mode) return null;
   if (mode === "ALL") return "ALL";
+
   return ALLOWED_MODES.includes(mode) ? mode : null;
 }
+
 function countInterestRole(entries, role) {
   return entries.filter((p) => p.role === role).length;
 }
@@ -369,7 +465,7 @@ function buildInterestRoleList(entries, role) {
 
   return filtered
     .map((p, index) => {
-      return `**${index + 1}.** ${getClassDisplay(p.class)} — **${p.character}** — **${p.rating}**`;
+      return `**${index + 1}.** ${getParticipantClassLine(p)} — **${p.character}** — **${p.rating}**`;
     })
     .join("\n");
 }
@@ -447,6 +543,7 @@ function buildInterestButtons(interestId) {
 module.exports = {
   MODE_LIMITS,
   ALLOWED_MODES,
+  CLASS_SPECS,
   CLASS_EMOJIS,
   parseEventDate,
   formatDiscordTimestamp,
@@ -459,6 +556,8 @@ module.exports = {
   prettyClassName,
   getClassIcon,
   getClassDisplay,
+  getSpecLabel,
+  getParticipantClassLine,
   getModeLimits,
   countRole,
   isRoleFull,
